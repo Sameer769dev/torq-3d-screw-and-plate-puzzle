@@ -1,0 +1,6 @@
+{
+  "name": "TORQ: 3D Screw & Plate Puzzle",
+  "description": "A tactile 3D mechanical screw-matching puzzle game where you unscrew anodized bolts, drop layered plates, and clear every board without jamming your dock.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

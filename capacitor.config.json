@@ -1,0 +1,32 @@
+{
+  "appId": "com.torq.screwplatepuzzle",
+  "appName": "TORQ: 3D Screw & Plate Puzzle",
+  "webDir": "dist",
+  "backgroundColor": "#070A0F",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#070A0F"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": true,
+      "backgroundColor": "#070A0F",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#070A0F",
+      "overlaysWebView": true
+    },
+    "ScreenOrientation": {
+      "defaultOrientation": "landscape"
+    }
+  }
+}
+

@@ -1,0 +1,60 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Mechanical Ring / Anodized Washer -->
+    <path
+        android:fillColor="#1E232E"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="2.5"
+        android:pathData="M 54,26 A 28,28 0 1,0 54,82 A 28,28 0 1,0 54,26 Z" />
+
+    <!-- Hexagonal Bolt Head -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 54,32 L 72,42.5 L 72,65.5 L 54,76 L 36,65.5 L 36,42.5 Z" />
+
+    <!-- Inner Metallic Hex Bevel -->
+    <path
+        android:fillColor="#D97706"
+        android:pathData="M 54,35 L 69,43.7 L 69,64.3 L 54,73 L 39,64.3 L 39,43.7 Z" />
+
+    <!-- Recessed Titanium Core -->
+    <path
+        android:fillColor="#181C25"
+        android:pathData="M 54,38 A 16,16 0 1,0 54,70 A 16,16 0 1,0 54,38 Z" />
+
+    <!-- Precision Cross/Star Screw Drive Recess -->
+    <!-- Vertical Slot -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 51.5,43 L 56.5,43 L 56.5,65 L 51.5,65 Z" />
+
+    <!-- Horizontal Slot -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 43,51.5 L 65,51.5 L 65,56.5 L 43,56.5 Z" />
+
+    <!-- Center Pivot Dot -->
+    <path
+        android:fillColor="#FEF3C7"
+        android:pathData="M 54,52 A 2,2 0 1,0 54,56 A 2,2 0 1,0 54,52 Z" />
+
+    <!-- Subtle Mechanical Accents / Bolt Teeth -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M 52,24 L 56,24 L 56,28 L 52,28 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M 52,80 L 56,80 L 56,84 L 52,84 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M 24,52 L 28,52 L 28,56 L 24,56 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M 80,52 L 84,52 L 84,56 L 80,56 Z" />
+
+</vector>
+
