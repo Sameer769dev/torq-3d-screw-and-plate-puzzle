@@ -24,3 +24,6 @@ android/*.iml
 android/app/*.iml
 *.apk
 *.aab
+
+.vercel
+.env*
