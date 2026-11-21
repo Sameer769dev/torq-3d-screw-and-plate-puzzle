@@ -41,11 +41,6 @@ export function isPointCoveredByPlate(
   const halfW = plate.width * 0.5 + margin;
   const halfH = plate.height * 0.5 + margin;
 
-  if (plate.shape === 'disc') {
-    const r = Math.max(plate.width, plate.height) * 0.5 + margin * 0.8;
-    return dx * dx + dy * dy <= r * r;
-  }
-
   return Math.abs(dx) <= halfW && Math.abs(dy) <= halfH;
 }
 

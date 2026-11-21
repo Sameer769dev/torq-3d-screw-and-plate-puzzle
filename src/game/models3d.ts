@@ -458,7 +458,9 @@ export function createCompositeScrewGroup(
 }
 
 /**
- * Creates a 2D THREE.Shape for a mechanical plate with generous rounded corners
+ * Creates a 2D THREE.Shape for a mechanical object plate with distinct, human-crafted
+ * silhouettes per PlateShape ('disc', 'arch', 'hex', 'triangle', 'l-bracket', 'rect')
+ * while keeping all lattice corner bolt holes strictly enclosed inside the plate body.
  */
 function createPlate2DShape(shape: PlateShape, width: number, height: number): THREE.Shape {
   const s = new THREE.Shape();
@@ -466,8 +468,8 @@ function createPlate2DShape(shape: PlateShape, width: number, height: number): T
   const hh = height / 2;
 
   if (shape === 'hex') {
-    // Machined octagonal/hexagonal chamfered plate that fully encloses corner bolt washers
-    const ch = Math.min(0.24, hw * 0.28, hh * 0.28);
+    // Machined 8-sided octagonal armor/bridge plate
+    const ch = Math.min(0.28, hw * 0.3, hh * 0.3);
     s.moveTo(-hw + ch, -hh);
     s.lineTo(hw - ch, -hh);
     s.lineTo(hw, -hh + ch);
@@ -480,12 +482,71 @@ function createPlate2DShape(shape: PlateShape, width: number, height: number): T
     return s;
   }
 
-  // Precision rounded stadium/chassis rectangle (strictly bounded within [-hw, hw] x [-hh, hh])
-  const r =
-    shape === 'disc' || shape === 'arch'
-      ? Math.min(0.42, hw * 0.46, hh * 0.46)
-      : Math.min(0.32, hw * 0.36, hh * 0.36);
+  if (shape === 'disc') {
+    // Deeply rounded circular / capsule / woofer / dial silhouette
+    const r = Math.min(0.46, hw * 0.48, hh * 0.48);
+    s.moveTo(-hw + r, -hh);
+    s.lineTo(hw - r, -hh);
+    s.quadraticCurveTo(hw, -hh, hw, -hh + r);
+    s.lineTo(hw, hh - r);
+    s.quadraticCurveTo(hw, hh, hw - r, hh);
+    s.lineTo(-hw + r, hh);
+    s.quadraticCurveTo(-hw, hh, -hw, hh - r);
+    s.lineTo(-hw, -hh + r);
+    s.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+    return s;
+  }
 
+  if (shape === 'arch') {
+    // Domed cockpit canopy / visor / arched hood with crisp mechanical base and high upper arch
+    const rBot = Math.min(0.18, hw * 0.22, hh * 0.22);
+    const rTop = Math.min(0.48, hw * 0.48, hh * 0.52);
+    s.moveTo(-hw + rBot, -hh);
+    s.lineTo(hw - rBot, -hh);
+    s.quadraticCurveTo(hw, -hh, hw, -hh + rBot);
+    s.lineTo(hw, hh - rTop);
+    s.quadraticCurveTo(hw, hh, hw - rTop, hh);
+    s.lineTo(-hw + rTop, hh);
+    s.quadraticCurveTo(-hw, hh, -hw, hh - rTop);
+    s.lineTo(-hw, -hh + rBot);
+    s.quadraticCurveTo(-hw, -hh, -hw + rBot, -hh);
+    return s;
+  }
+
+  if (shape === 'triangle') {
+    // Tapered aero delta-wing / stabilizer fin / nose-wedge plate
+    const chTop = Math.min(0.34, hw * 0.34, hh * 0.34);
+    const chBot = Math.min(0.16, hw * 0.2, hh * 0.2);
+    s.moveTo(-hw + chBot, -hh);
+    s.lineTo(hw - chBot, -hh);
+    s.lineTo(hw, -hh + chBot);
+    s.lineTo(hw, hh - chTop);
+    s.lineTo(hw - chTop, hh);
+    s.lineTo(-hw + chTop, hh);
+    s.lineTo(-hw, hh - chTop);
+    s.lineTo(-hw, -hh + chBot);
+    s.closePath();
+    return s;
+  }
+
+  if (shape === 'l-bracket') {
+    // Asymmetrically chamfered industrial gusset / structural arm bracket
+    const chBig = Math.min(0.32, hw * 0.32, hh * 0.32);
+    const rSmall = Math.min(0.18, hw * 0.2, hh * 0.2);
+    s.moveTo(-hw + rSmall, -hh);
+    s.lineTo(hw - chBig, -hh);
+    s.lineTo(hw, -hh + chBig);
+    s.lineTo(hw, hh - rSmall);
+    s.quadraticCurveTo(hw, hh, hw - rSmall, hh);
+    s.lineTo(-hw + chBig, hh);
+    s.lineTo(-hw, hh - chBig);
+    s.lineTo(-hw, -hh + rSmall);
+    s.quadraticCurveTo(-hw, -hh, -hw + rSmall, -hh);
+    return s;
+  }
+
+  // Default 'rect': Precision rounded chassis plate
+  const r = Math.min(0.28, hw * 0.32, hh * 0.32);
   s.moveTo(-hw + r, -hh);
   s.lineTo(hw - r, -hh);
   s.quadraticCurveTo(hw, -hh, hw, -hh + r);
@@ -622,6 +683,77 @@ export function createCompositePlateGroup(
     const grommetTop = new THREE.Mesh(grommetGeo, grommetMat);
     grommetTop.position.set(hole.x, hole.y, 0.09);
     group.add(grommetTop);
+  }
+
+  // Sculpted 3D Object Surface Hardware Details (Speaker Cones, Lens Bezels, Canopy Ribs, Wing Strakes, Armor Trim)
+  const isClearOfHoles = (px: number, py: number, minRad: number) =>
+    localHoleCoords.every((h) => Math.hypot(h.x - px, h.y - py) >= minRad);
+
+  if (shape === 'disc') {
+    // Rotary dial / camera lens / speaker woofer concentric bezel ring
+    const maxRingR = Math.min(width, height) * 0.34;
+    if (maxRingR >= 0.28 && isClearOfHoles(0, 0, maxRingR * 0.65)) {
+      const bezelRingGeo = new THREE.TorusGeometry(maxRingR, 0.032, 12, 32);
+      const bezelRing = new THREE.Mesh(bezelRingGeo, grommetMat);
+      bezelRing.position.set(0, 0, 0.082);
+      group.add(bezelRing);
+
+      const coreHubGeo = new THREE.CylinderGeometry(
+        maxRingR * 0.45,
+        maxRingR * 0.52,
+        0.04,
+        24
+      );
+      coreHubGeo.rotateX(Math.PI / 2);
+      const coreHub = new THREE.Mesh(coreHubGeo, grommetMat);
+      coreHub.position.set(0, 0, 0.075);
+      group.add(coreHub);
+    }
+  } else if (shape === 'arch') {
+    // Domed cockpit canopy / visor / cassette deck top arch trim bar
+    const archBarW = Math.max(0.6, width * 0.46);
+    const archY = height * 0.26;
+    if (isClearOfHoles(0, archY, 0.42)) {
+      const archRibGeo = new RoundedBoxGeometry(archBarW, 0.11, 0.045, 3, 0.03);
+      const archRib = new THREE.Mesh(archRibGeo, grommetMat);
+      archRib.position.set(0, archY, 0.082);
+      group.add(archRib);
+    }
+  } else if (shape === 'hex') {
+    // Octagonal reactor / tourbillon center emblem ring
+    const hexR = Math.min(width, height) * 0.28;
+    if (hexR >= 0.24 && isClearOfHoles(0, 0, hexR + 0.18)) {
+      const hexRingGeo = new THREE.TorusGeometry(hexR, 0.028, 8, 6);
+      const hexRing = new THREE.Mesh(hexRingGeo, grommetMat);
+      hexRing.position.set(0, 0, 0.082);
+      group.add(hexRing);
+    }
+  } else if (shape === 'triangle') {
+    // Aero delta-wing / stabilizer strake ribs
+    for (const side of [-1, 1]) {
+      const sx = side * width * 0.18;
+      if (isClearOfHoles(sx, 0, 0.42)) {
+        const strakeGeo = new RoundedBoxGeometry(
+          0.08,
+          Math.max(0.45, height * 0.48),
+          0.045,
+          2,
+          0.02
+        );
+        const strake = new THREE.Mesh(strakeGeo, grommetMat);
+        strake.position.set(sx, 0, 0.082);
+        strake.rotation.z = -side * 0.18;
+        group.add(strake);
+      }
+    }
+  } else if (isClearOfHoles(0, 0, 0.46)) {
+    // Machined chassis louver / structural spine rib for 'rect' and 'l-bracket'
+    const ribW = width >= height ? Math.max(0.5, width * 0.36) : 0.1;
+    const ribH = width >= height ? 0.1 : Math.max(0.5, height * 0.36);
+    const ribGeo = new RoundedBoxGeometry(ribW, ribH, 0.042, 2, 0.02);
+    const rib = new THREE.Mesh(ribGeo, grommetMat);
+    rib.position.set(0, 0, 0.08);
+    group.add(rib);
   }
 
   return group;

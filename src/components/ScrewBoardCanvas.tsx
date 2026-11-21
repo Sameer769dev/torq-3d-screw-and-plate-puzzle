@@ -1660,7 +1660,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         remainingBolts,
         smoothedGaugeFill,
         gauge.accentHex,
-        gauge.tierLabel
+        gauge.tierLabel,
+        currentBoard.levelName
       );
 
       const box0 = currentBoard.activeBoxes[0];

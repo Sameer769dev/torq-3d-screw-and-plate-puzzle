@@ -411,13 +411,19 @@ export function create3DReadoutPlaque(maxAnisotropy: number) {
     boltsLeft: number,
     difficultyFill = 0.18,
     difficultyAccentHex = '#38BDF8',
-    difficultyTierLabel = 'TORQ I'
+    difficultyTierLabel = 'TORQ I',
+    levelName = ''
   ) {
     const levelNum = levelIndex + 1;
     const clampedFill = Math.max(0.12, Math.min(1.0, difficultyFill));
     const fillQuantized = Math.round(clampedFill * 100);
+    const objectTitle = levelName
+      .replace(/^Level\s+\d+\s*[:·-]?\s*/i, '')
+      .replace(/^\d+\.\s*/, '')
+      .trim()
+      .toUpperCase();
 
-    const key = `${levelNum}|${Math.round(score)}|${boltsLeft}|${fillQuantized}|${difficultyAccentHex}|${difficultyTierLabel}`;
+    const key = `${levelNum}|${Math.round(score)}|${boltsLeft}|${fillQuantized}|${difficultyAccentHex}|${difficultyTierLabel}|${objectTitle}`;
     if (key === lastKey) return;
     lastKey = key;
 
@@ -467,54 +473,82 @@ export function create3DReadoutPlaque(maxAnisotropy: number) {
     ctx.font = '700 46px "JetBrains Mono", monospace';
     ctx.fillText(`${boltsLeft}`, 428, 96);
 
-    // 4. Subtle Horizontal Separator & Recessed Difficulty Gauge Strip (y = 116..162)
+    // 4. Horizontal Separator & Object Title + Difficulty Gauge Strip (y = 116..162)
     ctx.fillStyle = 'rgba(148, 163, 184, 0.16)';
     ctx.fillRect(20, 116, 472, 2);
 
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '700 16px "Chakra Petch", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('DIFF', 26, 146);
+    if (objectTitle) {
+      ctx.fillStyle = '#FDE047';
+      ctx.font = '700 18px "Chakra Petch", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`⚙ ${objectTitle}`, 24, 146, 252);
 
-    // Recessed gauge track
-    const trackX = 82;
-    const trackY = 129;
-    const trackW = 336;
-    const trackH = 20;
-    traceRoundRect(ctx, trackX, trackY, trackW, trackH, 8);
-    ctx.fillStyle = '#070A10';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+      // Compact Recessed Difficulty Gauge Track on right
+      const trackX = 290;
+      const trackY = 129;
+      const trackW = 136;
+      const trackH = 20;
+      traceRoundRect(ctx, trackX, trackY, trackW, trackH, 8);
+      ctx.fillStyle = '#070A10';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-    // Illuminated progressive gradient fill bar
-    const fillW = Math.max(16, Math.round((trackW - 6) * clampedFill));
-    const barGrad = ctx.createLinearGradient(trackX + 3, 0, trackX + trackW - 3, 0);
-    barGrad.addColorStop(0, '#38BDF8');
-    barGrad.addColorStop(0.42, '#10B981');
-    barGrad.addColorStop(0.74, '#F59E0B');
-    barGrad.addColorStop(1.0, '#EF4444');
+      const fillW = Math.max(12, Math.round((trackW - 6) * clampedFill));
+      const barGrad = ctx.createLinearGradient(trackX + 3, 0, trackX + trackW - 3, 0);
+      barGrad.addColorStop(0, '#38BDF8');
+      barGrad.addColorStop(0.42, '#10B981');
+      barGrad.addColorStop(0.74, '#F59E0B');
+      barGrad.addColorStop(1.0, '#EF4444');
 
-    ctx.save();
-    traceRoundRect(ctx, trackX + 3, trackY + 3, fillW, trackH - 6, 5);
-    ctx.clip();
-    ctx.fillStyle = barGrad;
-    ctx.fillRect(trackX + 3, trackY + 3, trackW - 6, trackH - 6);
-    ctx.restore();
+      ctx.save();
+      traceRoundRect(ctx, trackX + 3, trackY + 3, fillW, trackH - 6, 5);
+      ctx.clip();
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(trackX + 3, trackY + 3, trackW - 6, trackH - 6);
+      ctx.restore();
 
-    // Subtle 10-segment precision machinist ticks across the gauge track
-    ctx.fillStyle = 'rgba(7, 10, 16, 0.55)';
-    for (let s = 1; s < 10; s++) {
-      const tickX = Math.round(trackX + (trackW * s) / 10);
-      ctx.fillRect(tickX, trackY + 2, 2, trackH - 4);
+      ctx.fillStyle = difficultyAccentHex;
+      ctx.font = '700 16px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${fillQuantized}%`, 486, 146);
+    } else {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '700 16px "Chakra Petch", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('DIFF', 26, 146);
+
+      const trackX = 82;
+      const trackY = 129;
+      const trackW = 336;
+      const trackH = 20;
+      traceRoundRect(ctx, trackX, trackY, trackW, trackH, 8);
+      ctx.fillStyle = '#070A10';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const fillW = Math.max(16, Math.round((trackW - 6) * clampedFill));
+      const barGrad = ctx.createLinearGradient(trackX + 3, 0, trackX + trackW - 3, 0);
+      barGrad.addColorStop(0, '#38BDF8');
+      barGrad.addColorStop(0.42, '#10B981');
+      barGrad.addColorStop(0.74, '#F59E0B');
+      barGrad.addColorStop(1.0, '#EF4444');
+
+      ctx.save();
+      traceRoundRect(ctx, trackX + 3, trackY + 3, fillW, trackH - 6, 5);
+      ctx.clip();
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(trackX + 3, trackY + 3, trackW - 6, trackH - 6);
+      ctx.restore();
+
+      ctx.fillStyle = difficultyAccentHex;
+      ctx.font = '700 16px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${fillQuantized}%`, 486, 146);
     }
-
-    // Right-hand subtle percentage readout
-    ctx.fillStyle = difficultyAccentHex;
-    ctx.font = '700 16px "JetBrains Mono", monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${fillQuantized}%`, 486, 146);
 
     texture.needsUpdate = true;
   }
@@ -682,35 +716,42 @@ export function create3DFtueHintPlinth(maxAnisotropy: number) {
     lastKey = key;
 
     const { ctx, canvasW: w, canvasH: h, texture } = surface;
-    drawBannerBasePlate(surface, 'rgba(245, 158, 11, 0.65)');
+    const isObjectBrief = /^OBJECT:/i.test(key);
+    const displayCopy = isObjectBrief ? key.replace(/^OBJECT:\s*/i, '') : key;
+    drawBannerBasePlate(
+      surface,
+      isObjectBrief ? 'rgba(56, 189, 248, 0.7)' : 'rgba(245, 158, 11, 0.65)'
+    );
 
-    // Left amber GUIDE pill badge
-    traceRoundRect(ctx, 18, 18, 108, h - 36, 14);
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+    // Left badge pill (OBJECT or GUIDE)
+    traceRoundRect(ctx, 18, 18, 114, h - 36, 14);
+    ctx.fillStyle = isObjectBrief
+      ? 'rgba(56, 189, 248, 0.22)'
+      : 'rgba(245, 158, 11, 0.22)';
     ctx.fill();
-    ctx.strokeStyle = '#F59E0B';
+    ctx.strokeStyle = isObjectBrief ? '#38BDF8' : '#F59E0B';
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    ctx.fillStyle = '#FDE68A';
-    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.fillStyle = isObjectBrief ? '#BAE6FD' : '#FDE68A';
+    ctx.font = '700 19px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('GUIDE', 72, h / 2 + 1);
+    ctx.fillText(isObjectBrief ? 'OBJECT' : 'GUIDE', 75, h / 2 + 1);
 
     // Centered instruction copy with safe horizontal clamping
-    const textCenterX = 136 + (w - 156) / 2;
-    const maxCopyW = w - 168;
+    const textCenterX = 142 + (w - 162) / 2;
+    const maxCopyW = w - 174;
     let px = 29;
     ctx.font = `600 ${px}px "Chakra Petch", "Plus Jakarta Sans", sans-serif`;
-    while (px > 20 && ctx.measureText(key).width > maxCopyW) {
+    while (px > 19 && ctx.measureText(displayCopy).width > maxCopyW) {
       px -= 2;
       ctx.font = `600 ${px}px "Chakra Petch", "Plus Jakarta Sans", sans-serif`;
     }
     ctx.fillStyle = '#F8FAFC';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(key, textCenterX, h / 2 + 1, maxCopyW);
+    ctx.fillText(displayCopy, textCenterX, h / 2 + 1, maxCopyW);
 
     texture.needsUpdate = true;
   }

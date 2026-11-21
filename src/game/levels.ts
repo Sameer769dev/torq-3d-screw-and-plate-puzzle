@@ -3,6 +3,7 @@ import {
   LevelBlueprint,
   PlateBlueprint,
   PlateMaterialType,
+  PlateShape,
   ScrewBlueprint,
   ScrewColor,
 } from './types';
@@ -100,7 +101,8 @@ function buildLatticePlateForScrews(
   name: string,
   layer: number,
   screws: ScrewBlueprint[],
-  materialType: PlateMaterialType
+  materialType: PlateMaterialType,
+  shape: PlateShape = 'rect'
 ): PlateBlueprint {
   let minX = Infinity;
   let maxX = -Infinity;
@@ -126,7 +128,7 @@ function buildLatticePlateForScrews(
     id,
     name,
     layer,
-    shape: 'rect',
+    shape,
     materialType,
     x: cx,
     y: cy,
@@ -135,6 +137,484 @@ function buildLatticePlateForScrews(
     screwIds: screws.map((s) => s.id),
   };
 }
+
+interface ObjectPartSpec {
+  name: string;
+  shape: PlateShape;
+  material: PlateMaterialType;
+}
+
+interface ObjectLayerSpec {
+  pattern: 'center-crown' | 'triptych' | 'col-pods' | 'row-bars' | 'asymmetric-l';
+  parts: ObjectPartSpec[];
+}
+
+export interface ObjectArchetype {
+  title: string;
+  subtitle: string;
+  crown: ObjectPartSpec;
+  layers: ObjectLayerSpec[];
+}
+
+export const OBJECT_ARCHETYPES: readonly ObjectArchetype[] = [
+  {
+    title: 'Chronograph Watch',
+    subtitle: 'Unbolt the sapphire crystal bridge to expose the twin chronograph subdials.',
+    crown: { name: 'Sapphire Tourbillon Crystal', shape: 'disc', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Upper Watch Strap Lug', shape: 'arch', material: 'anodized-slate' },
+          { name: 'Lower Watch Strap Lug', shape: 'hex', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'West Minute Subdial', shape: 'disc', material: 'brushed-brass' },
+          { name: 'East Second Subdial', shape: 'disc', material: 'blued-steel' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Quadcopter Drone',
+    subtitle: 'Remove the central flight battery canopy to free the four rotor booms.',
+    crown: { name: 'LiPo Battery Flight Canopy', shape: 'hex', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Port Rotor Boom', shape: 'disc', material: 'anodized-slate' },
+          { name: 'Central Flight Bus', shape: 'rect', material: 'brushed-brass' },
+          { name: 'Starboard Rotor Boom', shape: 'disc', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Forward Gimbal Crossbar', shape: 'arch', material: 'blued-steel' },
+          { name: 'Aft Thruster Crossbar', shape: 'arch', material: 'brushed-brass' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Safe Vault Door',
+    subtitle: 'Crack the rotary combination dial and retract the heavy steel deadbolts.',
+    crown: { name: 'Rotary Combination Dial', shape: 'disc', material: 'acrylic-rose' },
+    layers: [
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Left Heavy Hinge Pillar', shape: 'l-bracket', material: 'brushed-brass' },
+          { name: 'Right Vault Frame Armor', shape: 'l-bracket', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Upper Steel Deadbolt Bar', shape: 'rect', material: 'blued-steel' },
+          { name: 'Lower Steel Deadbolt Bar', shape: 'rect', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Left Time-Lock Tumbler', shape: 'hex', material: 'acrylic-cyan' },
+          { name: 'Right Relocker Shield', shape: 'hex', material: 'acrylic-amber' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Space Shuttle',
+    subtitle: 'Unbolt the orbiter cockpit canopy, payload doors, and delta booster wings.',
+    crown: { name: 'Orbiter Cockpit Canopy', shape: 'arch', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Port Delta Wing', shape: 'triangle', material: 'brushed-brass' },
+          { name: 'Main Orbiter Fuselage', shape: 'rect', material: 'anodized-slate' },
+          { name: 'Starboard Delta Wing', shape: 'triangle', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Port Payload Bay Door', shape: 'l-bracket', material: 'blued-steel' },
+          { name: 'Starboard Payload Bay Door', shape: 'l-bracket', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Forward Nose Heat Shield', shape: 'arch', material: 'acrylic-amber' },
+          { name: 'Aft Main Thruster Nozzle', shape: 'hex', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Mecha Automaton',
+    subtitle: 'Disassemble the glowing cyber-visor, optic sensors, and titanium cranium.',
+    crown: { name: 'Forehead Reactor Crest', shape: 'hex', material: 'acrylic-rose' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Upper Cranium Chassis', shape: 'arch', material: 'anodized-slate' },
+          { name: 'Lower Neck Servo Mount', shape: 'rect', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Left Acoustic Ear Dish', shape: 'disc', material: 'blued-steel' },
+          { name: 'Right Acoustic Ear Dish', shape: 'disc', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Upper Brow Armor Plate', shape: 'arch', material: 'acrylic-amber' },
+          { name: 'Lower Vocoder Jawplate', shape: 'hex', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Left Cyber Optic Lens', shape: 'disc', material: 'acrylic-cyan' },
+          { name: 'Right Cyber Optic Lens', shape: 'disc', material: 'acrylic-cyan' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Deep Submarine',
+    subtitle: 'Unbolt the conning tower periscope, bow sonar dome, and pressure hull.',
+    crown: { name: 'Periscope Optic Dome', shape: 'disc', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Bow Hydroplane Fin', shape: 'triangle', material: 'brushed-brass' },
+          { name: 'Stern Rudder Stabilizer', shape: 'triangle', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Upper Titanium Pressure Hull', shape: 'rect', material: 'anodized-slate' },
+          { name: 'Lower Torpedo Tube Bay', shape: 'rect', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Spherical Bow Sonar Array', shape: 'disc', material: 'brushed-brass' },
+          { name: 'Stern Propeller Shroud', shape: 'disc', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Conning Tower Sail', shape: 'arch', material: 'acrylic-amber' },
+          { name: 'Ventral Ballast Keel', shape: 'hex', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'V8 Engine Block',
+    subtitle: 'Strip the supercharger intake scoop, twin cylinder heads, and crankcase sump.',
+    crown: { name: 'Supercharger Blower Scoop', shape: 'arch', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Intake Manifold Deck', shape: 'hex', material: 'anodized-slate' },
+          { name: 'Deep Oil Pan Sump', shape: 'l-bracket', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Left Cylinder Head Bank', shape: 'hex', material: 'brushed-brass' },
+          { name: 'Cast Crankcase Block', shape: 'rect', material: 'anodized-slate' },
+          { name: 'Right Cylinder Head Bank', shape: 'hex', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Harmonic Timing Pulley', shape: 'disc', material: 'acrylic-cyan' },
+          { name: 'Flywheel Clutch Housing', shape: 'disc', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Arcade Cabinet',
+    subtitle: 'Unbolt the CRT glass bezel, twin joystick control deck, and coin mech door.',
+    crown: { name: 'CRT Phosphor Screen Bezel', shape: 'arch', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Illuminated Marquee Header', shape: 'arch', material: 'brushed-brass' },
+          { name: 'Coin Reject Lower Cabinet', shape: 'l-bracket', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Player 1 Joystick Console', shape: 'disc', material: 'blued-steel' },
+          { name: 'Player 2 Action Button Deck', shape: 'disc', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Stereo Speaker Grille Bar', shape: 'hex', material: 'acrylic-amber' },
+          { name: 'Main Logic PCB Cage', shape: 'rect', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Battle Tank',
+    subtitle: 'Dismantle the reactive turret cupola, main cannon mantlet, and armored treads.',
+    crown: { name: 'Commander Hatch Cupola', shape: 'disc', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Left Armored Track Pod', shape: 'l-bracket', material: 'anodized-slate' },
+          { name: 'Lower Hull Belly Armor', shape: 'rect', material: 'blued-steel' },
+          { name: 'Right Armored Track Pod', shape: 'l-bracket', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Sloped Forward Glacis Plate', shape: 'triangle', material: 'brushed-brass' },
+          { name: 'Rear Engine Louver Deck', shape: 'rect', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Main Cannon Gun Mantlet', shape: 'hex', material: 'acrylic-rose' },
+          { name: 'Reactive Turret Cheek Bustle', shape: 'hex', material: 'acrylic-cyan' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Grandfather Clock',
+    subtitle: 'Unbolt the celestial moon dial, brass pendulum bob, and chime weight train.',
+    crown: { name: 'Celestial Moon-Phase Dial', shape: 'disc', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Swan-Neck Hood Pediment', shape: 'arch', material: 'brushed-brass' },
+          { name: 'Carved Plinth Baseplate', shape: 'l-bracket', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'West Chime Weight Tube', shape: 'rect', material: 'blued-steel' },
+          { name: 'Swinging Lyre Pendulum', shape: 'disc', material: 'brushed-brass' },
+          { name: 'East Strike Weight Tube', shape: 'rect', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Anchor Escapement Bridge', shape: 'hex', material: 'acrylic-cyan' },
+          { name: 'Westminster Hammer Rack', shape: 'hex', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Solar Satellite',
+    subtitle: 'Release the parabolic telemetry dish and unfold the twin photovoltaic wings.',
+    crown: { name: 'Parabolic High-Gain Dish', shape: 'disc', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Port Photovoltaic Wing', shape: 'rect', material: 'blued-steel' },
+          { name: 'Gold Foil Bus Module', shape: 'hex', material: 'brushed-brass' },
+          { name: 'Starboard Photovoltaic Wing', shape: 'rect', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Star Tracker Horizon Sensor', shape: 'arch', material: 'anodized-slate' },
+          { name: 'Ion Hall-Effect Thruster', shape: 'hex', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Port Reaction Gyro Wheel', shape: 'disc', material: 'acrylic-amber' },
+          { name: 'Starboard Reaction Gyro Wheel', shape: 'disc', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Steampunk Owl',
+    subtitle: 'Unbolt the brass beak guard, clockwork iris lenses, and articulated wings.',
+    crown: { name: 'Hooked Brass Beak Guard', shape: 'triangle', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Left Articulated Feather Wing', shape: 'triangle', material: 'brushed-brass' },
+          { name: 'Clockwork Ribcage Core', shape: 'hex', material: 'anodized-slate' },
+          { name: 'Right Articulated Feather Wing', shape: 'triangle', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Horned Brow Plume Crest', shape: 'arch', material: 'blued-steel' },
+          { name: 'Brazen Talon Perch Bar', shape: 'l-bracket', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Left Binocular Iris Lens', shape: 'disc', material: 'acrylic-cyan' },
+          { name: 'Right Binocular Iris Lens', shape: 'disc', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Locomotive Engine',
+    subtitle: 'Disassemble the round smokebox door, steam dome, and coupled driving wheels.',
+    crown: { name: 'Circular Smokebox Front Door', shape: 'disc', material: 'acrylic-rose' },
+    layers: [
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Pressurized Boiler Barrel', shape: 'rect', material: 'anodized-slate' },
+          { name: 'Cast Iron Cowcatcher Wedge', shape: 'triangle', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Forward Flanged Drive Wheel', shape: 'disc', material: 'brushed-brass' },
+          { name: 'Rear Coupled Drive Wheel', shape: 'disc', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Brass Steam Whistle Dome', shape: 'arch', material: 'acrylic-amber' },
+          { name: 'Piston Connecting Rod Guard', shape: 'l-bracket', material: 'acrylic-cyan' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Electric Guitar',
+    subtitle: 'Unbolt the contoured pickguard, dual humbucker pickups, and tremolo bridge.',
+    crown: { name: 'Contoured Acrylic Pickguard', shape: 'arch', material: 'acrylic-rose' },
+    layers: [
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Upper Double-Cutaway Horn', shape: 'triangle', material: 'brushed-brass' },
+          { name: 'Lower Resonant Body bout', shape: 'arch', material: 'blued-steel' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Neck Humbucker Coil Pickup', shape: 'hex', material: 'anodized-slate' },
+          { name: 'Tremolo Whammy Tailpiece', shape: 'l-bracket', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Bridge Humbucker Pickup', shape: 'hex', material: 'acrylic-cyan' },
+          { name: 'Rotary Tone & Volume Plate', shape: 'disc', material: 'acrylic-amber' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Mechanical Crab',
+    subtitle: 'Unpin the armored dorsal carapace, crusher pincers, and hydraulic walking legs.',
+    crown: { name: 'Armored Dorsal Carapace', shape: 'hex', material: 'acrylic-amber' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Port Walking Leg Linkage', shape: 'l-bracket', material: 'anodized-slate' },
+          { name: 'Ventral Plastron Underbelly', shape: 'hex', material: 'blued-steel' },
+          { name: 'Starboard Walking Leg Linkage', shape: 'l-bracket', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Heavy Left Crusher Pincer', shape: 'arch', material: 'brushed-brass' },
+          { name: 'Serrated Right Cutter Pincer', shape: 'arch', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Stalked Compound Optic Array', shape: 'disc', material: 'acrylic-cyan' },
+          { name: 'Rear Ballast Ventral Plate', shape: 'rect', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Lunar Rover',
+    subtitle: 'Dismantle the high-gain dish, RTG thermoelectric core, and rocker-bogie wheels.',
+    crown: { name: 'Omni-Directional Dish Antenna', shape: 'disc', material: 'acrylic-cyan' },
+    layers: [
+      {
+        pattern: 'triptych',
+        parts: [
+          { name: 'Port Rocker-Bogie Wheel Pod', shape: 'disc', material: 'anodized-slate' },
+          { name: 'Titanium Mobility Deck', shape: 'rect', material: 'brushed-brass' },
+          { name: 'Starboard Rocker-Bogie Wheel Pod', shape: 'disc', material: 'anodized-slate' },
+        ],
+      },
+      {
+        pattern: 'row-bars',
+        parts: [
+          { name: 'Panoramic Mast Camera Boom', shape: 'arch', material: 'blued-steel' },
+          { name: 'RTG Plutonium Heat Exchanger', shape: 'hex', material: 'brushed-brass' },
+        ],
+      },
+      {
+        pattern: 'col-pods',
+        parts: [
+          { name: 'Core Sample Drill Arm', shape: 'l-bracket', material: 'acrylic-amber' },
+          { name: 'Laser Spectrometer Turret', shape: 'hex', material: 'acrylic-rose' },
+        ],
+      },
+    ],
+  },
+];
 
 /**
  * Selects `count` cells from `availableCells` in a zone, preferring cells that maximize
@@ -191,14 +671,14 @@ export function generateEndlessBlueprint(
 ): LevelBlueprint & { solutionOrder: string[] } {
   const safeDepth = Math.max(0, Math.floor(depth));
 
-  // Hand-authored, mathematically unlosable FTUE Curriculum (Levels 1-4)
-  // Applied whenever no explicit DDA override profile is forced (standard player progression).
+  // Hand-authored, mathematically unlosable FTUE Curriculum Objects (Levels 1-4)
+  // Each level is a recognizable physical object crafted from distinct shaped plates.
   if (!ddaProfile && safeDepth === 0) {
-    // L1: 6 bolts, 2 colours, 1 layer, 0 blocked bolts (unlosable immediate win)
+    // L1: Pocket Radio — 6 bolts, 2 colours, 1 layer, 0 blocked bolts (unlosable immediate win)
     return {
       index: 0,
-      name: 'Level 1',
-      subtitle: 'Tap matching bolts to fill both Target Boxes.',
+      name: 'Level 1: Pocket Radio',
+      subtitle: 'Unbolt the brass speaker grille and tuner dial to open the radio.',
       difficulty: 'Apprentice',
       parTimeSec: 45,
       boxSequence: ['amber', 'cobalt'],
@@ -213,9 +693,9 @@ export function generateEndlessBlueprint(
       plates: [
         {
           id: 'p1',
-          name: 'Left Calibration Plate',
+          name: 'Brass Speaker Grille',
           layer: 1,
-          shape: 'rect',
+          shape: 'disc',
           materialType: 'brushed-brass',
           x: -1.14,
           y: 0.0,
@@ -225,9 +705,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p2',
-          name: 'Right Calibration Plate',
+          name: 'AM/FM Tuner Dial',
           layer: 1,
-          shape: 'rect',
+          shape: 'hex',
           materialType: 'blued-steel',
           x: 1.14,
           y: 0.0,
@@ -241,11 +721,11 @@ export function generateEndlessBlueprint(
   }
 
   if (!ddaProfile && safeDepth === 1) {
-    // L2: 9 bolts, 3 colours, 1 layer, 3 plates (teaches multi-plate clearing & queue order)
+    // L2: Twin Biplane — 9 bolts, 3 colours, 1 layer, 3 shaped wing & landing gear plates
     return {
       index: 1,
-      name: 'Level 2',
-      subtitle: 'Unbolt all 3 plates and clear the incoming color queue.',
+      name: 'Level 2: Twin Biplane',
+      subtitle: 'Disassemble the port wing, starboard wing, and landing gear strut.',
       difficulty: 'Apprentice',
       parTimeSec: 65,
       boxSequence: ['amber', 'cobalt', 'crimson'],
@@ -263,9 +743,9 @@ export function generateEndlessBlueprint(
       plates: [
         {
           id: 'p1',
-          name: 'Upper Left Guard',
+          name: 'Port Biplane Wing',
           layer: 1,
-          shape: 'rect',
+          shape: 'arch',
           materialType: 'brushed-brass',
           x: -1.71,
           y: 1.04,
@@ -275,9 +755,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p2',
-          name: 'Upper Right Guard',
+          name: 'Starboard Biplane Wing',
           layer: 1,
-          shape: 'rect',
+          shape: 'arch',
           materialType: 'blued-steel',
           x: 1.71,
           y: 1.04,
@@ -287,9 +767,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p3',
-          name: 'Lower Span Plate',
+          name: 'Landing Gear Strut',
           layer: 1,
-          shape: 'rect',
+          shape: 'hex',
           materialType: 'acrylic-cyan',
           x: 0.0,
           y: -1.56,
@@ -303,11 +783,11 @@ export function generateEndlessBlueprint(
   }
 
   if (!ddaProfile && safeDepth === 2) {
-    // L3: 9 bolts, 3 colours, 2 layers with covered bolt s2 teaching "Clear the top plate first"
+    // L3: Vintage Camera — 9 bolts, 3 colours, 2 layers with central Telephoto Lens Disc covering body bolt s2
     return {
       index: 2,
-      name: 'Level 3',
-      subtitle: 'Clear the top acrylic bridge first to uncover blocked bolts.',
+      name: 'Level 3: Vintage Camera',
+      subtitle: 'Remove the central telephoto lens ring first to release the camera body.',
       difficulty: 'Apprentice',
       parTimeSec: 75,
       boxSequence: ['amber', 'cobalt', 'crimson'],
@@ -325,9 +805,9 @@ export function generateEndlessBlueprint(
       plates: [
         {
           id: 'p1',
-          name: 'Upper Left Guard',
+          name: 'Left Grip Housing',
           layer: 1,
-          shape: 'rect',
+          shape: 'l-bracket',
           materialType: 'brushed-brass',
           x: -1.71,
           y: 1.04,
@@ -337,9 +817,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p2',
-          name: 'Upper Right Guard',
+          name: 'Shutter Rangefinder Body',
           layer: 1,
-          shape: 'rect',
+          shape: 'hex',
           materialType: 'blued-steel',
           x: 1.14,
           y: 1.04,
@@ -349,7 +829,7 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p3',
-          name: 'Lower Span Plate',
+          name: 'Tripod Mount Rail',
           layer: 1,
           shape: 'rect',
           materialType: 'brushed-brass',
@@ -361,9 +841,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p4',
-          name: 'Center Acrylic Bridge',
+          name: 'Telephoto Lens Ring',
           layer: 2,
-          shape: 'rect',
+          shape: 'disc',
           materialType: 'acrylic-cyan',
           x: 0.0,
           y: 0.0,
@@ -377,11 +857,11 @@ export function generateEndlessBlueprint(
   }
 
   if (!ddaProfile && safeDepth === 3) {
-    // L4: 12 bolts, 4 colours, 2 layers forcing >= 1 bolt (s12 crimson) into the Spare Dock to release lower bolts
+    // L4: Retro Boombox — 12 bolts, 4 colours, 2 layers with Cassette Door over Dual Bass Woofers
     return {
       index: 3,
-      name: 'Level 4',
-      subtitle: 'Park waiting bolts in the Spare Dock to uncover hidden bolts.',
+      name: 'Level 4: Retro Boombox',
+      subtitle: 'Park waiting bolts in the Spare Dock to open the cassette deck and woofers.',
       difficulty: 'Machinist',
       parTimeSec: 95,
       boxSequence: ['amber', 'cobalt', 'crimson', 'emerald'],
@@ -402,9 +882,9 @@ export function generateEndlessBlueprint(
       plates: [
         {
           id: 'p1',
-          name: 'Port Assembly Plate',
+          name: 'Left Bass Woofer',
           layer: 1,
-          shape: 'rect',
+          shape: 'disc',
           materialType: 'brushed-brass',
           x: -1.71,
           y: 1.04,
@@ -414,9 +894,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p2',
-          name: 'Starboard Assembly Plate',
+          name: 'Right Bass Woofer',
           layer: 1,
-          shape: 'rect',
+          shape: 'disc',
           materialType: 'blued-steel',
           x: 1.71,
           y: 1.04,
@@ -426,7 +906,7 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p3',
-          name: 'Base Chassis Bar',
+          name: 'Equalizer Base Deck',
           layer: 1,
           shape: 'rect',
           materialType: 'anodized-slate',
@@ -438,9 +918,9 @@ export function generateEndlessBlueprint(
         },
         {
           id: 'p4',
-          name: 'Top Amber Bridge',
+          name: 'Cassette Tape Door',
           layer: 2,
-          shape: 'rect',
+          shape: 'arch',
           materialType: 'acrylic-amber',
           x: 0.0,
           y: 0.0,
@@ -541,6 +1021,22 @@ export function generateEndlessBlueprint(
   // Track cells covered by upper plates so lower layers preferentially place bolts underneath upper plates!
   const coveredByUpperPlate = new Set<string>();
 
+  const archetypeIdx = Math.max(0, safeDepth - 4) % OBJECT_ARCHETYPES.length;
+  const archetypeCycle = Math.floor(Math.max(0, safeDepth - 4) / OBJECT_ARCHETYPES.length);
+  const archetype = OBJECT_ARCHETYPES[archetypeIdx];
+  const objectDisplayTitle =
+    safeDepth === 0
+      ? 'Pocket Radio'
+      : safeDepth === 1
+        ? 'Twin Biplane'
+        : safeDepth === 2
+          ? 'Vintage Camera'
+          : safeDepth === 3
+            ? 'Retro Boombox'
+            : archetypeCycle > 0
+              ? `${archetype.title} Mk.${archetypeCycle + 1}`
+              : archetype.title;
+
   const idPrefix = `e${safeDepth}`;
   const screwsByLayer = new Map<number, ScrewBlueprint[]>();
   const platesByLayer = new Map<number, PlateBlueprint[]>();
@@ -614,24 +1110,29 @@ export function generateEndlessBlueprint(
       return res;
     };
 
-    // Define disjoint rectangular zones on the 6x4 lattice for this layer:
-    // Alternating Horizontal Row Splits vs Vertical Column Splits guarantees:
-    //  - Zero same-layer plate overlap
-    //  - Perpendicular cross-layer plate interlocking!
+    // Select human-designed object layer anatomy from the active ObjectArchetype
+    const layerSpec: ObjectLayerSpec =
+      isTopLayer && count <= 3
+        ? { pattern: 'center-crown', parts: [archetype.crown] }
+        : archetype.layers[(layer - 1) % archetype.layers.length];
+
     let zoneDefs: { cMin: number; cMax: number; rMin: number; rMax: number }[] =
       [];
 
-    if (isTopLayer && count <= 3) {
-      // Single central bridge plate spanning the middle of the board
+    if (layerSpec.pattern === 'center-crown') {
       zoneDefs = [{ cMin: 1, cMax: 4, rMin: 1, rMax: 2 }];
-    } else if (layer % 2 === 1) {
-      // Odd layer: North Row Zone (r = 2..3) & South Row Zone (r = 0..1)
+    } else if (layerSpec.pattern === 'triptych' && count >= 4) {
+      zoneDefs = [
+        { cMin: 0, cMax: 1, rMin: 0, rMax: 3 },
+        { cMin: 2, cMax: 3, rMin: 0, rMax: 3 },
+        { cMin: 4, cMax: 5, rMin: 0, rMax: 3 },
+      ];
+    } else if (layerSpec.pattern === 'row-bars' || (layerSpec.pattern !== 'col-pods' && layer % 2 === 1)) {
       zoneDefs = [
         { cMin: 0, cMax: 5, rMin: 2, rMax: 3 },
         { cMin: 0, cMax: 5, rMin: 0, rMax: 1 },
       ];
     } else {
-      // Even layer: West Column Zone (c = 0..2) & East Column Zone (c = 3..5)
       zoneDefs = [
         { cMin: 0, cMax: 2, rMin: 0, rMax: 3 },
         { cMin: 3, cMax: 5, rMin: 0, rMax: 3 },
@@ -655,26 +1156,54 @@ export function generateEndlessBlueprint(
       zonePools.push(allFree.slice(0, half), allFree.slice(half));
     }
 
-    const layerNames =
-      PLATE_NAMES_BY_LAYER[(layer - 1) % PLATE_NAMES_BY_LAYER.length];
-    const materialPool =
-      layer >= numLayers - 1 ? ACRYLIC_MATERIALS : METAL_MATERIALS;
+    const activeParts = layerSpec.parts;
 
     if (zonePools.length === 1) {
       const picked = pickSpreadCellsFromZone(zonePools[0], count, rng);
       const pScrews = picked.map(addScrewAtCell);
-      const mat = materialPool[Math.floor(rng() * materialPool.length)];
+      const partSpec = activeParts[0] ?? archetype.crown;
       const plate = buildLatticePlateForScrews(
         `${idPrefix}_L${layer}_p1`,
-        layerNames[0],
+        partSpec.name,
         layer,
         pScrews,
-        mat
+        partSpec.material,
+        partSpec.shape
       );
       layerPlates.push(plate);
       markPlateCoverage(pScrews);
+    } else if (zonePools.length === 3) {
+      // 3-zone Triptych allocation (Left Wing + Center Core + Right Wing)
+      const counts = [0, 0, 0];
+      let rem = count;
+      let cursor = 0;
+      while (rem > 0 && cursor < 24) {
+        const zIdx = cursor % 3;
+        if (counts[zIdx] < zonePools[zIdx].length) {
+          counts[zIdx]++;
+          rem--;
+        }
+        cursor++;
+      }
+      for (let zIdx = 0; zIdx < 3; zIdx++) {
+        const zCount = counts[zIdx];
+        if (zCount <= 0) continue;
+        const picked = pickSpreadCellsFromZone(zonePools[zIdx], zCount, rng);
+        const pScrews = picked.map(addScrewAtCell);
+        const partSpec = activeParts[zIdx % activeParts.length];
+        const plate = buildLatticePlateForScrews(
+          `${idPrefix}_L${layer}_p${zIdx + 1}`,
+          partSpec.name,
+          layer,
+          pScrews,
+          partSpec.material,
+          partSpec.shape
+        );
+        layerPlates.push(plate);
+        markPlateCoverage(pScrews);
+      }
     } else {
-      // Distribute `count` across the 2 disjoint zones (at least 1..3 per zone, respecting pool size)
+      // Distribute `count` across the 2 disjoint zones
       let count0 = Math.min(
         zonePools[0].length,
         Math.max(count - zonePools[1].length, Math.ceil(count / 2))
@@ -691,14 +1220,14 @@ export function generateEndlessBlueprint(
         if (zCount <= 0) continue;
         const picked = pickSpreadCellsFromZone(zonePools[zIdx], zCount, rng);
         const pScrews = picked.map(addScrewAtCell);
-        const mat =
-          materialPool[(layer + zIdx + Math.floor(rng() * 2)) % materialPool.length];
+        const partSpec = activeParts[zIdx % activeParts.length];
         const plate = buildLatticePlateForScrews(
           `${idPrefix}_L${layer}_p${zIdx + 1}`,
-          layerNames[zIdx % layerNames.length],
+          partSpec.name,
           layer,
           pScrews,
-          mat
+          partSpec.material,
+          partSpec.shape
         );
         layerPlates.push(plate);
         markPlateCoverage(pScrews);
@@ -965,8 +1494,8 @@ export function generateEndlessBlueprint(
 
   return {
     index: safeDepth,
-    name: `Level ${safeDepth + 1}`,
-    subtitle: 'Unbolt interlocking plates in sequence to clear the workbench.',
+    name: `Level ${safeDepth + 1}: ${objectDisplayTitle}`,
+    subtitle: archetype.subtitle,
     difficulty: difficultyTier,
     parTimeSec: 45 + totalBoxes * 18,
     boxSequence,
@@ -977,11 +1506,11 @@ export function generateEndlessBlueprint(
 }
 
 export const LEVELS: LevelBlueprint[] = [
-  // LEVEL 1: Calibration Bracket (9 screws on unique 6x4 lattice cells, 2 layers, 4 plates)
+  // LEVEL 1: Vintage Camera (9 screws on unique 6x4 lattice cells, 2 layers, 4 sculpted plates)
   {
     index: 0,
-    name: '01. Calibration Bracket',
-    subtitle: 'Clear top acrylic guards to release the brass core.',
+    name: '01. Vintage Camera',
+    subtitle: 'Unbolt the telephoto lens ring to open the shutter housing.',
     difficulty: 'Apprentice',
     parTimeSec: 65,
     boxSequence: ['amber', 'cobalt', 'crimson'],
@@ -1001,9 +1530,9 @@ export const LEVELS: LevelBlueprint[] = [
     plates: [
       {
         id: 'p1',
-        name: 'Upper Left Guard',
+        name: 'Left Grip Housing',
         layer: 1,
-        shape: 'rect',
+        shape: 'l-bracket',
         materialType: 'brushed-brass',
         x: -1.71,
         y: 1.04,
@@ -1013,9 +1542,9 @@ export const LEVELS: LevelBlueprint[] = [
       },
       {
         id: 'p2',
-        name: 'Upper Right Guard',
+        name: 'Shutter Rangefinder Body',
         layer: 1,
-        shape: 'rect',
+        shape: 'hex',
         materialType: 'blued-steel',
         x: 1.14,
         y: 1.04,
@@ -1025,7 +1554,7 @@ export const LEVELS: LevelBlueprint[] = [
       },
       {
         id: 'p3',
-        name: 'Lower Span Plate',
+        name: 'Tripod Mount Rail',
         layer: 1,
         shape: 'rect',
         materialType: 'brushed-brass',
@@ -1037,9 +1566,9 @@ export const LEVELS: LevelBlueprint[] = [
       },
       {
         id: 'p4',
-        name: 'Center Acrylic Bridge',
+        name: 'Telephoto Lens Ring',
         layer: 2,
-        shape: 'rect',
+        shape: 'disc',
         materialType: 'acrylic-cyan',
         x: 0.0,
         y: 0.0,

@@ -1477,11 +1477,20 @@ export default function TorqGame() {
     ftueState,
     flags.t3IdleHandDelayMs
   );
-  const ftueHint = getFtueHintForLevel(
+  const rawFtueHint = getFtueHintForLevel(
     board.levelIndex,
     ftueState,
     recentBlockedAttempt
   );
+  const cleanObjectTitle = board.levelName
+    .replace(/^Level\s+\d+\s*[:·-]?\s*/i, '')
+    .trim()
+    .toUpperCase();
+  const ftueHint = recentBlockedAttempt
+    ? rawFtueHint
+    : rawFtueHint
+      ? `OBJECT: ${cleanObjectTitle} · ${rawFtueHint}`
+      : `OBJECT: ${cleanObjectTitle} — ${board.levelSubtitle}`;
   const hasBottomBoostersUnlocked =
     isControlUnlocked('slot', effectiveHighestLevel, ftueState) ||
     isControlUnlocked('hammer', effectiveHighestLevel, ftueState) ||
