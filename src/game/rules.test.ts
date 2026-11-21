@@ -616,8 +616,9 @@ test('Day Streak counter tracks daily gameplay sessions across same-day, consecu
   assert.equal(s2.status, 'extended');
 });
 
-test('3D Radioactive Liquid Auto-Play fills as each bolt comes out and autonomously solves a level once full', () => {
-  let ap = createInitialAutoPlayState(0, 9);
+test('3D Radioactive Liquid Auto-Play fills gradually across multiple levels (45 bolts) and autonomously solves a level once full', () => {
+  let ap = createInitialAutoPlayState(0);
+  assert.equal(ap.targetBolts, 45);
   assert.equal(ap.fillRatio, 0);
   assert.equal(ap.isReady, false);
   assert.equal(ap.autoPlaying, false);
@@ -625,21 +626,29 @@ test('3D Radioactive Liquid Auto-Play fills as each bolt comes out and autonomou
   // Cannot activate before reaching 100%
   assert.equal(activateAutoPlay(ap).autoPlaying, false);
 
-  // Each extracted bolt fills the radioactive liquid column
-  for (let i = 1; i <= 8; i++) {
+  // Completing an entire 15-bolt level only charges 15/45 (33%), NOT 100% in a single level
+  for (let i = 1; i <= 15; i++) {
+    ap = recordBoltExtractedForAutoPlay(ap, 1);
+  }
+  assert.equal(ap.chargeBolts, 15);
+  assert.equal(ap.percent, 33);
+  assert.equal(ap.isReady, false);
+
+  // Extract bolts 16..44 across subsequent levels -> still charging
+  for (let i = 16; i <= 44; i++) {
     ap = recordBoltExtractedForAutoPlay(ap, 1);
     assert.equal(ap.chargeBolts, i);
     assert.equal(ap.isReady, false);
   }
 
-  // 9th bolt reaches 100% -> unlocks Auto-Play!
+  // 45th bolt reaches 100% -> unlocks Auto-Play!
   ap = recordBoltExtractedForAutoPlay(ap, 1);
-  assert.equal(ap.chargeBolts, 9);
+  assert.equal(ap.chargeBolts, 45);
   assert.equal(ap.fillRatio, 1);
   assert.equal(ap.percent, 100);
   assert.equal(ap.isReady, true);
 
-  // Activate Auto-Play on a generated Level 2 board (12+ bolts) and verify autonomous solve!
+  // Activate Auto-Play on a generated Level 2 board and verify autonomous solve!
   ap = activateAutoPlay(ap);
   assert.equal(ap.autoPlaying, true);
   assert.equal(ap.isReady, false);

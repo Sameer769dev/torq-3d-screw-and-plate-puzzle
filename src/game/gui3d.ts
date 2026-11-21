@@ -2186,20 +2186,12 @@ export function create3DRadioactiveAutoPlayRig(maxAnisotropy: number) {
     { type: 'auto_play' },
     maxAnisotropy
   );
-  glassMesh.userData = { guiAction: { type: 'auto_play' } };
-  liquidMesh.userData = { guiAction: { type: 'auto_play' } };
-  headerMesh.userData = { guiAction: { type: 'auto_play' } };
+  glassMesh.userData = {};
+  liquidMesh.userData = {};
+  headerMesh.userData = {};
   group.add(glassMesh);
   group.add(headerMesh);
   group.add(autoPlayBtn.group);
-
-  // Invisible full-height raycast proxy on autoPlayBtn.group so clicking anywhere on the right-side reactor triggers auto_play!
-  const reactorHitGeo = new THREE.BoxGeometry(1.08, 3.85, 0.55);
-  const reactorHitMat = new THREE.MeshBasicMaterial({ visible: false });
-  const reactorHitProxy = new THREE.Mesh(reactorHitGeo, reactorHitMat);
-  reactorHitProxy.position.set(0, 1.36, 0.15);
-  reactorHitProxy.userData = { guiAction: { type: 'auto_play' } };
-  autoPlayBtn.group.add(reactorHitProxy);
 
   let displayedFill = 0;
   let lastHeaderKey = '';

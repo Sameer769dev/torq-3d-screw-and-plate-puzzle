@@ -22,6 +22,7 @@ import {
 } from './game/ftue';
 import {
   activateAutoPlay,
+  AUTO_PLAY_TARGET_BOLTS,
   AutoPlayState,
   completeAutoPlayLevel,
   createInitialAutoPlayState,
@@ -186,10 +187,14 @@ export default function TorqGame() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('autoplay_ready') === '1') {
-        return createInitialAutoPlayState(9, 9);
+        return createInitialAutoPlayState(
+          AUTO_PLAY_TARGET_BOLTS,
+          AUTO_PLAY_TARGET_BOLTS
+        );
       }
     }
-    return createInitialAutoPlayState(0, 9);
+    const savedCharge = cloudSaveManager.getState().autoPlayChargeBolts ?? 0;
+    return createInitialAutoPlayState(savedCharge, AUTO_PLAY_TARGET_BOLTS);
   });
   const autoPlayRef = useRef<AutoPlayState>(autoPlay);
   autoPlayRef.current = autoPlay;
@@ -1111,7 +1116,17 @@ export default function TorqGame() {
     if (gamePhase !== 'playing' || soundSettingsOpen) return;
     recordToolFirstUse('autoPlay', board.levelIndex);
     if (!autoPlay.isReady && !autoPlay.autoPlaying) {
-      handleFuelAutoPlayAd();
+      soundEngine.playBlocked();
+      setSoundState(soundEngine.getState());
+      hapticsEngine.pulseBlocked();
+      setBoard((prev) => ({
+        ...prev,
+        lastActionFeedback: {
+          type: 'blocked',
+          message: `Auto-Play Reactor charging: ${autoPlay.percent}% (${autoPlay.chargeBolts}/${autoPlay.targetBolts} bolts)`,
+          timestamp: Date.now(),
+        },
+      }));
       return;
     }
     setAutoPlay((prev) => {
@@ -1121,7 +1136,17 @@ export default function TorqGame() {
       setSoundState(soundEngine.getState());
       return activateAutoPlay(prev);
     });
-  }, [gamePhase, soundSettingsOpen, board.levelIndex, autoPlay.isReady, autoPlay.autoPlaying, handleFuelAutoPlayAd, recordToolFirstUse]);
+  }, [
+    gamePhase,
+    soundSettingsOpen,
+    board.levelIndex,
+    autoPlay.isReady,
+    autoPlay.autoPlaying,
+    autoPlay.percent,
+    autoPlay.chargeBolts,
+    autoPlay.targetBolts,
+    recordToolFirstUse,
+  ]);
 
   // Autonomous solver loop when 3D Radioactive Auto-Play is activated!
   useEffect(() => {
@@ -1532,7 +1557,12 @@ export default function TorqGame() {
         toggleHammer: () => setBoard((prev) => toggleHammerMode(prev)),
         addExtraSlot: () => setBoard((prev) => unlockExtraDockSlot(prev)),
         setAutoPlayReady: () => {
-          setAutoPlay(createInitialAutoPlayState(9, 9));
+          setAutoPlay(
+            createInitialAutoPlayState(
+              AUTO_PLAY_TARGET_BOLTS,
+              AUTO_PLAY_TARGET_BOLTS
+            )
+          );
         },
         board,
       };

@@ -5,14 +5,15 @@ import { BoardState } from './types';
  * 3D Radioactive Liquid Auto-Play Reactor State & Pure Logic.
  *
  * - Every bolt removed from the board during manual play adds +1 charge to the
- *   3D Radioactive Liquid column (`chargeBolts` toward `targetBolts = 9`).
+ *   3D Radioactive Liquid column (`chargeBolts` toward `targetBolts = 45`,
+ *   requiring ~3 to 4 full levels of manual bolt extractions).
  * - Once the liquid reaches the top (`fillRatio >= 1.0`, `isReady === true`),
- *   the player unlocks the ability to Auto-Play the current level!
+ *   the player unlocks the ability to Auto-Play a level!
  * - Activating Auto-Play drains the radioactive liquid column while autonomously
  *   unscrewing bolts in an optimal solver sequence until the level is cleared.
  */
 
-export const AUTO_PLAY_TARGET_BOLTS = 9;
+export const AUTO_PLAY_TARGET_BOLTS = 45;
 
 export interface AutoPlayState {
   chargeBolts: number; // [0 .. targetBolts]

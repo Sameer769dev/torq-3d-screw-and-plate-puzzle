@@ -111,11 +111,12 @@ test('Monetization: Rewarded Hammer Refill forges additional hammers', () => {
 });
 
 test('Monetization: Rewarded Auto-Play Fuel instantly tops off reactor to 100%', () => {
-  let autoPlay = createInitialAutoPlayState(2, 9);
+  let autoPlay = createInitialAutoPlayState(2);
+  assert.equal(autoPlay.targetBolts, 45);
   assert.equal(autoPlay.isReady, false);
 
   autoPlay = fuelAutoPlayToFull(autoPlay);
-  assert.equal(autoPlay.chargeBolts, 9);
+  assert.equal(autoPlay.chargeBolts, 45);
   assert.equal(autoPlay.fillRatio, 1.0);
   assert.equal(autoPlay.percent, 100);
   assert.equal(autoPlay.isReady, true);
