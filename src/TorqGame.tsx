@@ -1524,17 +1524,17 @@ export default function TorqGame() {
 
   const overlayModal: ModalOverlay3DState = conflictSave
     ? {
-        kind: 'cloud_conflict',
-        cloud: conflictSave.cloud,
-        local: conflictSave.local,
-      }
+      kind: 'cloud_conflict',
+      cloud: conflictSave.cloud,
+      local: conflictSave.local,
+    }
     : sessionRecapOpen
       ? {
-          kind: 'session_recap',
-          levelNumber: board.levelIndex + 1,
-          score: board.score,
-          maxCombo: board.maxCombo,
-        }
+        kind: 'session_recap',
+        levelNumber: board.levelIndex + 1,
+        score: board.score,
+        maxCombo: board.maxCombo,
+      }
       : { kind: 'none' };
 
   useEffect(() => {

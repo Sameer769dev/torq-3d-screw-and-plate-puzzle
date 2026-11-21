@@ -16,6 +16,7 @@ import {
   recordBoardCompletionDDA,
 } from './dda';
 import { HAPTIC_PATTERNS, HapticsEngine } from './haptics';
+import { computeViewportLayout } from './layout';
 import { generateEndlessBlueprint, LEVELS } from './levels';
 import {
   createLevelTransition3DState,
@@ -929,6 +930,69 @@ test('38. Machine SFX triggers (buttons, tools, uiConfirm, material plates) trac
   eng.playToolActivate('cam');
   eng.playUiConfirm();
   eng.playPlateDrop('brushed-brass');
+});
+
+test('Responsive 3D viewport layout prevents overlap between Puzzle Board, Hint Plinth, Power-Up Deck, Spare Dock, and Auto-Play Reactor across all screen aspect ratios', () => {
+  const aspects = [
+    9 / 19.5, // Tall portrait phone
+    9 / 16,   // Standard portrait phone
+    4 / 3,    // Tablet landscape
+    16 / 9,   // Standard landscape phone / desktop
+    19.5 / 9, // Modern Android/iOS landscape phone
+    20 / 9,   // Tall Android landscape phone
+    21 / 9,   // Ultrawide landscape phone
+  ];
+
+  for (const aspect of aspects) {
+    const ly = computeViewportLayout(aspect);
+
+    // Project a Z=0.72 highest-layer plate point onto the Z=0.10 HUD plane from camera (0, camY, zoomZ)
+    const projectToHudY = (worldY: number, z: number) =>
+      ly.camY + ((worldY - ly.camY) * (ly.zoomZ - 0.1)) / (ly.zoomZ - z);
+    const projectToHudX = (worldX: number, z: number) =>
+      (worldX * (ly.zoomZ - 0.1)) / (ly.zoomZ - z);
+
+    const botDeckTop = ly.botDeckY + 0.43 * ly.deckBtnScale;
+    const hintHalfH = 0.28 * ly.hintScale;
+    const hintBot = projectToHudY(ly.hintY - hintHalfH, 0.14);
+    const hintTop = projectToHudY(ly.hintY + hintHalfH, 0.14);
+
+    // 1. Hint Plinth must sit strictly ABOVE the Bottom Power-Up Deck with zero overlap
+    assert.ok(
+      hintBot > botDeckTop + 0.05,
+      `aspect=${aspect.toFixed(2)}: Hint bottom (${hintBot.toFixed(3)}) overlaps Power-Up Deck top (${botDeckTop.toFixed(3)})`
+    );
+
+    // 2. Bottom-most Layer 4 puzzle plate edge must sit strictly ABOVE the Hint Plinth
+    const boardWorldBot =
+      ly.boardOffsetY - 1.56 * ly.boardSpreadY - 0.44 * ly.boltBaseScale;
+    const boardProjBot = projectToHudY(boardWorldBot, 0.72);
+    assert.ok(
+      boardProjBot > hintTop + 0.08,
+      `aspect=${aspect.toFixed(2)}: Board bottom (${boardProjBot.toFixed(3)}) overlaps Hint top (${hintTop.toFixed(3)})`
+    );
+
+    // 3. Top-most Layer 4 puzzle plate edge must sit strictly BELOW the Spare Dock Rail
+    const dockBot = ly.dockY - 0.39 * ly.dockScaleY;
+    const boardWorldTop =
+      ly.boardOffsetY + 1.56 * ly.boardSpreadY + 0.44 * ly.boltBaseScale;
+    const boardProjTop = projectToHudY(boardWorldTop, 0.72);
+    assert.ok(
+      boardProjTop < dockBot - 0.08,
+      `aspect=${aspect.toFixed(2)}: Board top (${boardProjTop.toFixed(3)}) overlaps Spare Dock bottom (${dockBot.toFixed(3)})`
+    );
+
+    // 4. In Landscape, Right-most Layer 4 plate edge must clear the Auto-Play Reactor
+    if (!ly.isPortrait) {
+      const reactorLeft = ly.reactorX - 0.59 * ly.reactorScale;
+      const boardWorldRight = 2.85 * ly.boardSpreadX + 0.44 * ly.boltBaseScale;
+      const boardProjRight = projectToHudX(boardWorldRight, 0.72);
+      assert.ok(
+        boardProjRight < reactorLeft - 0.1,
+        `aspect=${aspect.toFixed(2)}: Board right (${boardProjRight.toFixed(3)}) overlaps Reactor left (${reactorLeft.toFixed(3)})`
+      );
+    }
+  }
 });
 
 

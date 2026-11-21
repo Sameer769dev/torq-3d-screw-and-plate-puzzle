@@ -9,6 +9,7 @@ import {
   isControlUnlocked,
   NewToolAnnouncement,
 } from '../game/ftue';
+import { computeViewportLayout, ViewportLayout } from '../game/layout';
 import {
   Button3DHandle,
   create3DControlButton,
@@ -358,249 +359,6 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       (container.clientWidth || window.innerWidth) /
       Math.max(1, container.clientHeight || window.innerHeight);
 
-    const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(44 * 0.5)); // ~0.4040262
-
-    interface ViewportLayout {
-      aspect: number;
-      isPortrait: boolean;
-      zoomZ: number;
-      camY: number;
-      targetY: number;
-      frameVisW: number;
-      frameVisH: number;
-      centerY: number;
-      topHudY: number;
-      plaqueX: number;
-      plaqueY: number;
-      plaqueScale: number;
-      tray0X: number;
-      tray1X: number;
-      trayY: number;
-      trayScale: number;
-      soundBtnX: number;
-      muteBtnX: number;
-      pauseBtnX: number;
-      utilBtnY: number;
-      utilScale: number;
-      dockY: number;
-      dockScaleX: number;
-      dockScaleY: number;
-      dockRingScale: number;
-      boardOffsetY: number;
-      boardSpreadX: number;
-      boardSpreadY: number;
-      boltBaseScale: number;
-      botDeckY: number;
-      deckBtnScale: number;
-      deckBtnX: [number, number, number, number];
-      reactorX: number;
-      reactorY: number;
-      reactorScale: number;
-      modalScale: number;
-    }
-
-    const computeViewportLayout = (wAspect: number): ViewportLayout => {
-      const safeAspect = Math.max(0.4, Math.min(3.5, wAspect || 1.78));
-      const isPort = safeAspect < 1.0;
-
-      if (isPort) {
-        const minW = 7.25;
-        const minH = 12.2;
-        const zForH = minH / (2 * TAN_HALF_FOV);
-        const zForW = (minW / safeAspect) / (2 * TAN_HALF_FOV);
-        const zoomZ = Math.max(zForH, zForW);
-        const centerY = 0.05;
-        const camY = -0.25;
-        const targetY = 0.1;
-
-        const frameDist = zoomZ + 0.26;
-        const frameVisH = 2 * frameDist * TAN_HALF_FOV;
-        const frameVisW = frameVisH * safeAspect;
-
-        const hudDist = zoomZ - 0.08;
-        const hudVisH = 2 * hudDist * TAN_HALF_FOV;
-        const hudVisW = hudVisH * safeAspect;
-        const innerHalfW = hudVisW * 0.5 - 0.36;
-        const innerHalfH = hudVisH * 0.5 - 0.38;
-
-        const plaqueScale = 0.92;
-        const utilScale = 0.96;
-        const topRowY = centerY + innerHalfH - 0.54;
-        const plaqueX = -innerHalfW + 1.39 * plaqueScale + 0.08;
-        const pauseBtnX = innerHalfW - 0.38 * utilScale - 0.08;
-        const muteBtnX = pauseBtnX - 0.82 * utilScale;
-        const soundBtnX = muteBtnX - 0.82 * utilScale;
-
-        const trayScale = 0.98;
-        const trayY = topRowY - 1.12;
-        const trayOffset = 1.05 * trayScale;
-
-        const dockY = trayY - 0.98;
-        const botDeckY = centerY - innerHalfH + 0.56;
-        const deckBtnScale = 0.96;
-        const deckStep = (innerHalfW * 2 - 1.3 * deckBtnScale) / 3;
-
-        const boardTop = dockY - 0.62;
-        const boardBot = botDeckY + 0.68;
-        const boardOffsetY = (boardTop + boardBot) * 0.5;
-        const availBoardW = Math.max(5.8, innerHalfW * 2 - 0.55);
-        const availBoardH = Math.max(3.6, boardTop - boardBot - 0.4);
-        const boardSpreadX = Math.min(1.12, Math.max(0.92, (availBoardW - 0.9) / 5.7));
-        const boardSpreadY = Math.min(1.12, Math.max(0.92, (availBoardH - 0.9) / 3.12));
-
-        return {
-          aspect: safeAspect,
-          isPortrait: true,
-          zoomZ,
-          camY,
-          targetY,
-          frameVisW,
-          frameVisH,
-          centerY,
-          topHudY: topRowY,
-          plaqueX,
-          plaqueY: topRowY,
-          plaqueScale,
-          tray0X: -trayOffset,
-          tray1X: trayOffset,
-          trayY,
-          trayScale,
-          soundBtnX,
-          muteBtnX,
-          pauseBtnX,
-          utilBtnY: topRowY,
-          utilScale,
-          dockY,
-          dockScaleX: Math.min(1.06, (innerHalfW * 2 - 0.4) / 6.3),
-          dockScaleY: 1.0,
-          dockRingScale: 1.0,
-          boardOffsetY,
-          boardSpreadX,
-          boardSpreadY,
-          boltBaseScale: 1.02,
-          botDeckY,
-          deckBtnScale,
-          deckBtnX: [
-            -1.5 * deckStep,
-            -0.5 * deckStep,
-            0.5 * deckStep,
-            1.5 * deckStep,
-          ],
-          reactorX: innerHalfW - 0.56,
-          reactorY: botDeckY + 1.85,
-          reactorScale: 0.78,
-          modalScale: Math.min(1.0, (hudVisW - 0.6) / 6.0),
-        };
-      }
-
-      // Landscape Mode (100% Full-Screen Edge-to-Edge Utilization across 4:3, 16:9, 19.5:9, 20:9, 21:9)
-      const minH = 7.76;
-      const minW = 10.65;
-      const zForH = minH / (2 * TAN_HALF_FOV);
-      const zForW = (minW / safeAspect) / (2 * TAN_HALF_FOV);
-      const zoomZ = Math.max(zForH, zForW);
-      const centerY = -0.12;
-      const camY = -0.42;
-      const targetY = -0.12;
-
-      const frameDist = zoomZ + 0.26;
-      const frameVisH = 2 * frameDist * TAN_HALF_FOV;
-      const frameVisW = frameVisH * safeAspect;
-
-      const hudDist = zoomZ - 0.08;
-      const hudVisH = 2 * hudDist * TAN_HALF_FOV;
-      const hudVisW = hudVisH * safeAspect;
-      const innerHalfW = hudVisW * 0.5 - 0.42;
-      const innerHalfH = hudVisH * 0.5 - 0.36;
-
-      // Smoothly scale up UI & spread puzzle board across wider aspect ratios (16:9 through 21:9+)
-      const wideFactor = Math.min(1.0, Math.max(0.0, (safeAspect - 1.38) / (2.18 - 1.38)));
-
-      const topHudY = centerY + innerHalfH - 0.52;
-      const plaqueScale = 1.04 + wideFactor * 0.24;
-      const plaqueHalfW = 1.39 * plaqueScale;
-      const plaqueX = -innerHalfW + plaqueHalfW + 0.14;
-
-      const utilScale = 1.12 + wideFactor * 0.26;
-      const utilStep = 0.86 * utilScale;
-      const pauseBtnX = innerHalfW - 0.39 * utilScale - 0.14;
-      const muteBtnX = pauseBtnX - utilStep;
-      const soundBtnX = muteBtnX - utilStep;
-
-      const trayScale = 1.06 + wideFactor * 0.18;
-      const leftBoundAfterPlaque = plaqueX + plaqueHalfW + 0.22;
-      const rightBoundBeforeUtils = soundBtnX - 0.39 * utilScale - 0.22;
-      const trayCenter = (leftBoundAfterPlaque + rightBoundBeforeUtils) * 0.5;
-      const trayOffset = 1.04 * trayScale;
-      const tray0X = trayCenter - trayOffset;
-      const tray1X = trayCenter + trayOffset;
-
-      const dockY = topHudY - 0.98;
-      const dockScaleX = 1.04 + wideFactor * 0.28;
-      const dockScaleY = 1.02 + wideFactor * 0.08;
-      const dockRingScale = 1.04 + wideFactor * 0.12;
-
-      const botDeckY = centerY - innerHalfH + 0.46;
-      const deckBtnScale = 1.12 + wideFactor * 0.24;
-      const deckStep = (1.52 + wideFactor * 0.42) * deckBtnScale;
-
-      const reactorScale = 0.96 + wideFactor * 0.18;
-      const reactorHalfW = 0.59 * reactorScale;
-      const reactorX = innerHalfW - reactorHalfW - 0.16;
-      const reactorY = centerY - 0.05;
-
-      // Expand the 6x4 puzzle board horizontally & vertically to fill the wide workbench cleanly
-      const boardOffsetY = (dockY - 0.44 + (botDeckY + 0.48)) * 0.5;
-      const maxBoardHalfW = Math.min(innerHalfW - 0.45, reactorX - reactorHalfW - 0.38);
-      const boardSpreadX = Math.min(1.42, Math.max(1.0, (maxBoardHalfW - 0.52) / 2.85));
-      const boardSpreadY = 1.02 + wideFactor * 0.05;
-      const boltBaseScale = 1.04 + wideFactor * 0.12;
-
-      return {
-        aspect: safeAspect,
-        isPortrait: false,
-        zoomZ,
-        camY,
-        targetY,
-        frameVisW,
-        frameVisH,
-        centerY,
-        topHudY,
-        plaqueX,
-        plaqueY: topHudY,
-        plaqueScale,
-        tray0X,
-        tray1X,
-        trayY: topHudY,
-        trayScale,
-        soundBtnX,
-        muteBtnX,
-        pauseBtnX,
-        utilBtnY: topHudY,
-        utilScale,
-        dockY,
-        dockScaleX,
-        dockScaleY,
-        dockRingScale,
-        boardOffsetY,
-        boardSpreadX,
-        boardSpreadY,
-        boltBaseScale,
-        botDeckY,
-        deckBtnScale,
-        deckBtnX: [
-          -1.5 * deckStep,
-          -0.5 * deckStep,
-          0.5 * deckStep,
-          1.5 * deckStep,
-        ],
-        reactorX,
-        reactorY,
-        reactorScale,
-        modalScale: 1.08 + wideFactor * 0.1,
-      };
-    };
-
     const layoutRef = { current: computeViewportLayout(initAspect) };
     const isPortrait = layoutRef.current.isPortrait;
 
@@ -836,13 +594,13 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     const applyViewportLayout = (ly: ViewportLayout) => {
       const setWbLayout = workbenchGroup.userData.setWorkbenchLayout as
         | ((
-            visW: number,
-            visH: number,
-            centerY: number,
-            dockY: number,
-            dockScaleX: number,
-            dockScaleY: number
-          ) => void)
+          visW: number,
+          visH: number,
+          centerY: number,
+          dockY: number,
+          dockScaleX: number,
+          dockScaleY: number
+        ) => void)
         | undefined;
       setWbLayout?.(
         ly.frameVisW,
@@ -1476,6 +1234,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           const newAspect = width / height;
           const prevSpreadX = layoutRef.current.boardSpreadX;
           const prevSpreadY = layoutRef.current.boardSpreadY;
+          const prevOffsetY = layoutRef.current.boardOffsetY;
           const nextLayout = computeViewportLayout(newAspect);
           layoutRef.current = nextLayout;
 
@@ -1485,7 +1244,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
           if (
             Math.abs(nextLayout.boardSpreadX - prevSpreadX) > 0.01 ||
-            Math.abs(nextLayout.boardSpreadY - prevSpreadY) > 0.01
+            Math.abs(nextLayout.boardSpreadY - prevSpreadY) > 0.01 ||
+            Math.abs(nextLayout.boardOffsetY - prevOffsetY) > 0.01
           ) {
             buildLevelScene(false);
           }
@@ -1604,13 +1364,13 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       ftueHintPlinth.group.visible = hintPlaqueBlend > 0.02;
       if (ftueHintPlinth.group.visible) {
         const hintBaseY = hasBottomBoostersRef.current
-          ? ly.botDeckY + 0.66 * ly.deckBtnScale
-          : ly.botDeckY + 0.12;
-        const hintScale = isPortNowForHud ? 0.85 : Math.min(1.18, ly.deckBtnScale * 0.92);
+          ? ly.hintY
+          : ly.botDeckY + 0.1;
+        const hintScale = ly.hintScale;
         ftueHintPlinth.group.position.set(
           0,
           hintBaseY - (1 - hintPlaqueBlend) * 0.24,
-          0.28
+          0.14
         );
         ftueHintPlinth.group.scale.setScalar(
           hintScale * Math.max(0.01, hintPlaqueBlend)
