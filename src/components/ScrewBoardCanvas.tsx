@@ -1522,20 +1522,22 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       const extraSlotsAvailable = currentBoard.extraSlotsRemaining ?? 0;
       const hasSlotBoosters = extraSlotsAvailable > 0;
 
-      // Hammer 3D Button: shows available count or +1 refill badge (zero ads)
+      // Hammer 3D Button: shows free inventory count, or clear '▶ AD' badge for +2 Rewarded Refill when 0
       updateButton3DCapTexture(
         hammerBtn3D,
         '🔨',
         currentBoard.hammerMode
           ? 'SMASH!'
-          : 'HAMMER',
+          : hasHammers
+            ? 'HAMMER'
+            : '+2 AD',
         currentBoard.hammerMode ? '#EF4444' : (hasHammers ? '#FDE047' : '#10B981'),
-        hasHammers ? String(currentBoard.hammersRemaining) : '+1',
+        hasHammers ? String(currentBoard.hammersRemaining) : '▶',
         currentBoard.hammerMode,
         false
       );
 
-      // Slot 3D Button: shows available count or +1 badge (zero ads)
+      // Slot 3D Button: shows free slot count, or clear '▶ AD' badge for +1 Rewarded Dock Slot when 0
       if (!canExpandDock) {
         updateButton3DCapTexture(
           slotBtn3D,
@@ -1560,9 +1562,9 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         updateButton3DCapTexture(
           slotBtn3D,
           '+1',
-          'SLOT',
+          'SLOT AD',
           '#10B981',
-          '+1',
+          '▶',
           false,
           false
         );

@@ -636,17 +636,29 @@ export default function TorqGame() {
     });
   }, []);
 
-  // Seamless Endless Progression (100% Automatic Background Cloud Save, Zero Ad Interruptions)
+  // Seamless Endless Progression with Smart, Grace-Protected Interstitial Pacing (Zero Ads During FTUE / Session 1 / Post-Rewarded Grace)
   useEffect(() => {
     if (gamePhase !== 'playing' || board.outcome !== 'victory') {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      advanceFromWonBoard();
+    let cancelled = false;
+    const completedIdx = board.levelIndex;
+    const timer = window.setTimeout(async () => {
+      if (cancelled) return;
+      await adsManager.showLevelCompleteInterstitial(completedIdx, {
+        completed: ftueStateRef.current.completed,
+        sessionCount: ftueStateRef.current.sessionCount,
+      });
+      if (!cancelled) {
+        advanceFromWonBoard();
+      }
     }, 650);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [gamePhase, board.outcome, board.levelIndex, advanceFromWonBoard]);
 
   const startGame = useCallback((depth?: number) => {
@@ -935,7 +947,10 @@ export default function TorqGame() {
 
   const handleRefillHammerAd = useCallback(async () => {
     hapticsEngine.pulseButtonTap();
-    setBoard((prev) => toggleHammerMode(refillHammerCount(prev, 1)));
+    const watched = await adsManager.showRewarded('hammer_refill');
+    if (!watched) return;
+    // Generous +2 Hammers reward maximizes opt-in rate while arming Hammer Mode immediately
+    setBoard((prev) => toggleHammerMode(refillHammerCount(prev, 2)));
     soundEngine.playToolActivate('hammer_arm');
     setSoundState(soundEngine.getState());
   }, []);
@@ -957,6 +972,7 @@ export default function TorqGame() {
   }, [gamePhase, soundSettingsOpen, board.hammersRemaining, board.hammerMode, board.levelIndex, handleRefillHammerAd, recordToolFirstUse]);
 
   const handleExtraSlot = useCallback(async () => {
+    if (gamePhase !== 'playing' || soundSettingsOpen) return;
     recordToolFirstUse('slot', board.levelIndex);
     if (board.maxDockSlots >= MAX_POSSIBLE_DOCK_SLOTS) {
       soundEngine.playBlocked();
@@ -972,11 +988,30 @@ export default function TorqGame() {
       return;
     }
 
+    const freeSlotsAvail = board.extraSlotsRemaining ?? 0;
+    if (freeSlotsAvail > 0) {
+      hapticsEngine.pulseButtonTap();
+      setBoard((prev) => unlockExtraDockSlot(prev));
+      soundEngine.playToolActivate('slot_expand');
+      setSoundState(soundEngine.getState());
+      return;
+    }
+
+    // Out of free slot charges -> High-value Opt-In Rewarded Video (+1 permanent dock slot)
     hapticsEngine.pulseButtonTap();
+    const watched = await adsManager.showRewarded('extra_slot');
+    if (!watched) return;
     setBoard((prev) => unlockExtraDockSlot(prev));
     soundEngine.playToolActivate('slot_expand');
     setSoundState(soundEngine.getState());
-  }, [board.maxDockSlots, board.levelIndex, recordToolFirstUse]);
+  }, [
+    gamePhase,
+    soundSettingsOpen,
+    board.maxDockSlots,
+    board.extraSlotsRemaining,
+    board.levelIndex,
+    recordToolFirstUse,
+  ]);
 
   const handleResolveConflict = useCallback(
     (choice: 'smart_merge' | 'keep_cloud' | 'keep_local') => {
@@ -1055,6 +1090,9 @@ export default function TorqGame() {
   }, [board.levelIndex]);
 
   const handleReviveAd = useCallback(async () => {
+    hapticsEngine.pulseButtonTap();
+    const watched = await adsManager.showRewarded('revive');
+    if (!watched) return;
     hapticsEngine.pulseLevelComplete();
     setBoard((prev) => reviveBoardState(prev));
     document.body.dataset.state = 'playing';
@@ -1064,13 +1102,20 @@ export default function TorqGame() {
   }, []);
 
   const handleFuelAutoPlayAd = useCallback(async () => {
+    hapticsEngine.pulseButtonTap();
+    const watched = await adsManager.showRewarded('autoplay_fuel');
+    if (!watched) return;
     hapticsEngine.pulseBoxComplete();
-    setAutoPlay((prev) => activateAutoPlay(fuelAutoPlayToFull(prev)));
+    const remBoltsNow = board.screws.filter((s) => s.location === 'board').length;
+    setAutoPlay((prev) => activateAutoPlay(fuelAutoPlayToFull(prev), remBoltsNow));
     soundEngine.playToolActivate('auto_play');
     setSoundState(soundEngine.getState());
-  }, []);
+  }, [board.screws]);
 
   const handleDoubleStreakAd = useCallback(async () => {
+    hapticsEngine.pulseButtonTap();
+    const watched = await adsManager.showRewarded('streak_doubler');
+    if (!watched) return;
     hapticsEngine.pulseLevelComplete();
     setDayStreak((prev) => doubleDailyStreakBonus(prev));
     setBestScore((prev) => prev + dayStreak.rewardBonusPoints);
@@ -1113,21 +1158,12 @@ export default function TorqGame() {
     );
   }, [board.levelIndex, recordToolFirstUse]);
 
-  const handleAutoPlay = useCallback(() => {
+  const handleAutoPlay = useCallback(async () => {
     if (gamePhase !== 'playing' || soundSettingsOpen) return;
     recordToolFirstUse('autoPlay', board.levelIndex);
     if (!autoPlay.isReady && !autoPlay.autoPlaying) {
-      soundEngine.playBlocked();
-      setSoundState(soundEngine.getState());
-      hapticsEngine.pulseBlocked();
-      setBoard((prev) => ({
-        ...prev,
-        lastActionFeedback: {
-          type: 'blocked',
-          message: `Auto-Play Reactor charging: ${autoPlay.percent}% (${autoPlay.chargeBolts}/${autoPlay.targetBolts} bolts)`,
-          timestamp: Date.now(),
-        },
-      }));
+      // Explicit tap on bottom reactor button offers opt-in Rewarded Video instant Auto-Play boost
+      await handleFuelAutoPlayAd();
       return;
     }
     const remBoltsNow = board.screws.filter((s) => s.location === 'board').length;
@@ -1145,9 +1181,7 @@ export default function TorqGame() {
     board.screws,
     autoPlay.isReady,
     autoPlay.autoPlaying,
-    autoPlay.percent,
-    autoPlay.chargeBolts,
-    autoPlay.targetBolts,
+    handleFuelAutoPlayAd,
     recordToolFirstUse,
   ]);
 

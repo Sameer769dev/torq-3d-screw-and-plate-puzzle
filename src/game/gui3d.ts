@@ -1317,7 +1317,8 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
               stageBtns[i],
               '2X',
               'STREAK',
-              '#10B981'
+              '#10B981',
+              '▶'
             );
           } else if (i === 5) {
             stageBtns[i].group.visible = true;
@@ -1387,8 +1388,8 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
         });
         updateButton3DCapTexture(
           primaryBtn,
-          '⚡ REVIVE · CONTINUE',
-          'CLEAR JAM & RESUME',
+          '⚡ REVIVE · ▶ AD',
+          'WATCH AD: CLEAR 2 BOLTS + SLOT',
           '#10B981',
           undefined,
           true,
@@ -2292,12 +2293,12 @@ export function create3DRadioactiveAutoPlayRig(maxAnisotropy: number) {
     } else {
       updateButton3DCapTexture(
         autoPlayBtn,
-        '☢ FILL',
+        '▶ BOOST',
         `${pct}%`,
-        '#84CC16',
-        `${chargeBolts}/${targetBolts}`,
+        '#10B981',
+        'AD',
         false,
-        true
+        false
       );
       autoPlayBtn.group.scale.setScalar(1.0);
     }

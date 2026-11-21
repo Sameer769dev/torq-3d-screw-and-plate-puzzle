@@ -231,9 +231,51 @@ test('Monetization: AdsManager initializes and reports state, bottom banner is d
   const state = adsManager.getState();
   assert.equal(state.initialized, true);
 
-  // Bottom banner ad is disabled in favor of dual 3D native ads flanking workbench
+  // Bottom banner ad stays permanently disabled for 100% full-screen clean gameplay
   await adsManager.showBanner();
   assert.equal(adsManager.getState().bannerVisible, false);
+});
+
+test('Monetization: Smart Pacing protects players with 120s Rewarded Grace Shield & multi-level interstitial spacing', async () => {
+  await adsManager.initialize();
+  adsManager.resetPacingForTests();
+
+  const ftueDoneS2 = { completed: true, sessionCount: 2 };
+  const t0 = Date.now();
+
+  // 1. Watching any Rewarded Video (e.g. Revive or +2 Hammers) grants a 120-second interstitial grace period
+  const earned = await adsManager.showRewarded('hammer_refill');
+  assert.equal(earned, true);
+
+  // Immediately after watching a rewarded ad (even on Level 12, Session 2), forced interstitial MUST be blocked!
+  assert.equal(
+    await adsManager.showLevelCompleteInterstitial(12, ftueDoneS2, t0 + 30_000),
+    false,
+    'Interstitial must be suppressed during the 120s Rewarded-Video Grace Shield'
+  );
+
+  // 2. After 125 seconds (> 120s grace period), a natural level-complete interstitial is allowed
+  assert.equal(
+    await adsManager.showLevelCompleteInterstitial(13, ftueDoneS2, t0 + 125_000),
+    true,
+    'Interstitial triggers cleanly after grace period expires'
+  );
+
+  // 3. Even after 110 seconds (> 100s time cooldown), completing only 1 level since the last interstitial is still blocked (requires >= 2 levels!)
+  assert.equal(
+    await adsManager.showLevelCompleteInterstitial(14, ftueDoneS2, t0 + 235_000),
+    false,
+    'Interstitial must require at least 2 completed levels since the previous interstitial'
+  );
+
+  // 4. On the 2nd completed level after >= 100s cooldown, interstitial fires cleanly again!
+  assert.equal(
+    await adsManager.showLevelCompleteInterstitial(15, ftueDoneS2, t0 + 240_000),
+    true,
+    'Interstitial fires cleanly on the 2nd completed level once cooldown has elapsed'
+  );
+
+  adsManager.resetPacingForTests();
 });
 
 
