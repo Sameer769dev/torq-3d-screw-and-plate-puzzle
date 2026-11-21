@@ -353,34 +353,280 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     scene.environment = createStudioHDREnvironment(renderer);
     scene.environmentIntensity = 0.95;
 
-    // 3. Camera & OrbitControls (Aspect-Ratio Responsive for Portrait Mobile & Desktop)
+    // 3. Camera & OrbitControls (Dynamic Full-Viewport Responsive Fitting for Any Screen Aspect Ratio)
     const initAspect =
       (container.clientWidth || window.innerWidth) /
-      (container.clientHeight || window.innerHeight);
-    const isPortrait = initAspect < 1.0;
+      Math.max(1, container.clientHeight || window.innerHeight);
 
-    const initZoomZ = isPortrait
-      ? Math.min(20.0, Math.max(13.5, 7.6 / Math.max(0.38, initAspect)))
-      : (initAspect < 1.15 ? 11.4 * (1.18 / Math.max(0.7, initAspect)) : 11.8);
+    const TAN_HALF_FOV = Math.tan(THREE.MathUtils.degToRad(44 * 0.5)); // ~0.4040262
 
-    const initTargetY = isPortrait ? (gamePhaseRef.current === 'playing' ? 0.65 : 0.45) : 0.15;
-    const initCamY = isPortrait ? (gamePhaseRef.current === 'playing' ? -0.15 : 0.45) : -0.55;
+    interface ViewportLayout {
+      aspect: number;
+      isPortrait: boolean;
+      zoomZ: number;
+      camY: number;
+      targetY: number;
+      frameVisW: number;
+      frameVisH: number;
+      centerY: number;
+      topHudY: number;
+      plaqueX: number;
+      plaqueY: number;
+      plaqueScale: number;
+      tray0X: number;
+      tray1X: number;
+      trayY: number;
+      trayScale: number;
+      soundBtnX: number;
+      muteBtnX: number;
+      pauseBtnX: number;
+      utilBtnY: number;
+      utilScale: number;
+      dockY: number;
+      dockScaleX: number;
+      dockScaleY: number;
+      dockRingScale: number;
+      boardOffsetY: number;
+      boardSpreadX: number;
+      boardSpreadY: number;
+      boltBaseScale: number;
+      botDeckY: number;
+      deckBtnScale: number;
+      deckBtnX: [number, number, number, number];
+      reactorX: number;
+      reactorY: number;
+      reactorScale: number;
+      modalScale: number;
+    }
+
+    const computeViewportLayout = (wAspect: number): ViewportLayout => {
+      const safeAspect = Math.max(0.4, Math.min(3.5, wAspect || 1.78));
+      const isPort = safeAspect < 1.0;
+
+      if (isPort) {
+        const minW = 7.25;
+        const minH = 12.2;
+        const zForH = minH / (2 * TAN_HALF_FOV);
+        const zForW = (minW / safeAspect) / (2 * TAN_HALF_FOV);
+        const zoomZ = Math.max(zForH, zForW);
+        const centerY = 0.05;
+        const camY = -0.25;
+        const targetY = 0.1;
+
+        const frameDist = zoomZ + 0.26;
+        const frameVisH = 2 * frameDist * TAN_HALF_FOV;
+        const frameVisW = frameVisH * safeAspect;
+
+        const hudDist = zoomZ - 0.08;
+        const hudVisH = 2 * hudDist * TAN_HALF_FOV;
+        const hudVisW = hudVisH * safeAspect;
+        const innerHalfW = hudVisW * 0.5 - 0.36;
+        const innerHalfH = hudVisH * 0.5 - 0.38;
+
+        const plaqueScale = 0.92;
+        const utilScale = 0.96;
+        const topRowY = centerY + innerHalfH - 0.54;
+        const plaqueX = -innerHalfW + 1.39 * plaqueScale + 0.08;
+        const pauseBtnX = innerHalfW - 0.38 * utilScale - 0.08;
+        const muteBtnX = pauseBtnX - 0.82 * utilScale;
+        const soundBtnX = muteBtnX - 0.82 * utilScale;
+
+        const trayScale = 0.98;
+        const trayY = topRowY - 1.12;
+        const trayOffset = 1.05 * trayScale;
+
+        const dockY = trayY - 0.98;
+        const botDeckY = centerY - innerHalfH + 0.56;
+        const deckBtnScale = 0.96;
+        const deckStep = (innerHalfW * 2 - 1.3 * deckBtnScale) / 3;
+
+        const boardTop = dockY - 0.62;
+        const boardBot = botDeckY + 0.68;
+        const boardOffsetY = (boardTop + boardBot) * 0.5;
+        const availBoardW = Math.max(5.8, innerHalfW * 2 - 0.55);
+        const availBoardH = Math.max(3.6, boardTop - boardBot - 0.4);
+        const boardSpreadX = Math.min(1.12, Math.max(0.92, (availBoardW - 0.9) / 5.7));
+        const boardSpreadY = Math.min(1.12, Math.max(0.92, (availBoardH - 0.9) / 3.12));
+
+        return {
+          aspect: safeAspect,
+          isPortrait: true,
+          zoomZ,
+          camY,
+          targetY,
+          frameVisW,
+          frameVisH,
+          centerY,
+          topHudY: topRowY,
+          plaqueX,
+          plaqueY: topRowY,
+          plaqueScale,
+          tray0X: -trayOffset,
+          tray1X: trayOffset,
+          trayY,
+          trayScale,
+          soundBtnX,
+          muteBtnX,
+          pauseBtnX,
+          utilBtnY: topRowY,
+          utilScale,
+          dockY,
+          dockScaleX: Math.min(1.06, (innerHalfW * 2 - 0.4) / 6.3),
+          dockScaleY: 1.0,
+          dockRingScale: 1.0,
+          boardOffsetY,
+          boardSpreadX,
+          boardSpreadY,
+          boltBaseScale: 1.02,
+          botDeckY,
+          deckBtnScale,
+          deckBtnX: [
+            -1.5 * deckStep,
+            -0.5 * deckStep,
+            0.5 * deckStep,
+            1.5 * deckStep,
+          ],
+          reactorX: innerHalfW - 0.56,
+          reactorY: botDeckY + 1.85,
+          reactorScale: 0.78,
+          modalScale: Math.min(1.0, (hudVisW - 0.6) / 6.0),
+        };
+      }
+
+      // Landscape Mode (100% Full-Screen Edge-to-Edge Utilization across 4:3, 16:9, 19.5:9, 20:9, 21:9)
+      const minH = 7.76;
+      const minW = 10.65;
+      const zForH = minH / (2 * TAN_HALF_FOV);
+      const zForW = (minW / safeAspect) / (2 * TAN_HALF_FOV);
+      const zoomZ = Math.max(zForH, zForW);
+      const centerY = -0.12;
+      const camY = -0.42;
+      const targetY = -0.12;
+
+      const frameDist = zoomZ + 0.26;
+      const frameVisH = 2 * frameDist * TAN_HALF_FOV;
+      const frameVisW = frameVisH * safeAspect;
+
+      const hudDist = zoomZ - 0.08;
+      const hudVisH = 2 * hudDist * TAN_HALF_FOV;
+      const hudVisW = hudVisH * safeAspect;
+      const innerHalfW = hudVisW * 0.5 - 0.42;
+      const innerHalfH = hudVisH * 0.5 - 0.36;
+
+      // Smoothly scale up UI & spread puzzle board across wider aspect ratios (16:9 through 21:9+)
+      const wideFactor = Math.min(1.0, Math.max(0.0, (safeAspect - 1.38) / (2.18 - 1.38)));
+
+      const topHudY = centerY + innerHalfH - 0.52;
+      const plaqueScale = 1.04 + wideFactor * 0.24;
+      const plaqueHalfW = 1.39 * plaqueScale;
+      const plaqueX = -innerHalfW + plaqueHalfW + 0.14;
+
+      const utilScale = 1.12 + wideFactor * 0.26;
+      const utilStep = 0.86 * utilScale;
+      const pauseBtnX = innerHalfW - 0.39 * utilScale - 0.14;
+      const muteBtnX = pauseBtnX - utilStep;
+      const soundBtnX = muteBtnX - utilStep;
+
+      const trayScale = 1.06 + wideFactor * 0.18;
+      const leftBoundAfterPlaque = plaqueX + plaqueHalfW + 0.22;
+      const rightBoundBeforeUtils = soundBtnX - 0.39 * utilScale - 0.22;
+      const trayCenter = (leftBoundAfterPlaque + rightBoundBeforeUtils) * 0.5;
+      const trayOffset = 1.04 * trayScale;
+      const tray0X = trayCenter - trayOffset;
+      const tray1X = trayCenter + trayOffset;
+
+      const dockY = topHudY - 0.98;
+      const dockScaleX = 1.04 + wideFactor * 0.28;
+      const dockScaleY = 1.02 + wideFactor * 0.08;
+      const dockRingScale = 1.04 + wideFactor * 0.12;
+
+      const botDeckY = centerY - innerHalfH + 0.46;
+      const deckBtnScale = 1.12 + wideFactor * 0.24;
+      const deckStep = (1.52 + wideFactor * 0.42) * deckBtnScale;
+
+      const reactorScale = 0.96 + wideFactor * 0.18;
+      const reactorHalfW = 0.59 * reactorScale;
+      const reactorX = innerHalfW - reactorHalfW - 0.16;
+      const reactorY = centerY - 0.05;
+
+      // Expand the 6x4 puzzle board horizontally & vertically to fill the wide workbench cleanly
+      const boardOffsetY = (dockY - 0.44 + (botDeckY + 0.48)) * 0.5;
+      const maxBoardHalfW = Math.min(innerHalfW - 0.45, reactorX - reactorHalfW - 0.38);
+      const boardSpreadX = Math.min(1.42, Math.max(1.0, (maxBoardHalfW - 0.52) / 2.85));
+      const boardSpreadY = 1.02 + wideFactor * 0.05;
+      const boltBaseScale = 1.04 + wideFactor * 0.12;
+
+      return {
+        aspect: safeAspect,
+        isPortrait: false,
+        zoomZ,
+        camY,
+        targetY,
+        frameVisW,
+        frameVisH,
+        centerY,
+        topHudY,
+        plaqueX,
+        plaqueY: topHudY,
+        plaqueScale,
+        tray0X,
+        tray1X,
+        trayY: topHudY,
+        trayScale,
+        soundBtnX,
+        muteBtnX,
+        pauseBtnX,
+        utilBtnY: topHudY,
+        utilScale,
+        dockY,
+        dockScaleX,
+        dockScaleY,
+        dockRingScale,
+        boardOffsetY,
+        boardSpreadX,
+        boardSpreadY,
+        boltBaseScale,
+        botDeckY,
+        deckBtnScale,
+        deckBtnX: [
+          -1.5 * deckStep,
+          -0.5 * deckStep,
+          0.5 * deckStep,
+          1.5 * deckStep,
+        ],
+        reactorX,
+        reactorY,
+        reactorScale,
+        modalScale: 1.08 + wideFactor * 0.1,
+      };
+    };
+
+    const layoutRef = { current: computeViewportLayout(initAspect) };
+    const isPortrait = layoutRef.current.isPortrait;
 
     const camera = new THREE.PerspectiveCamera(44, initAspect, 0.1, 100);
-    camera.position.set(0, initCamY, initZoomZ);
-    camera.lookAt(0, initTargetY, isPortrait && gamePhaseRef.current !== 'playing' ? 2.2 : 0);
+    camera.position.set(0, layoutRef.current.camY, layoutRef.current.zoomZ);
+    camera.lookAt(
+      0,
+      layoutRef.current.targetY,
+      isPortrait && gamePhaseRef.current !== 'playing' ? 2.2 : 0
+    );
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = !isSoftwareGl;
     controls.dampingFactor = 0.08;
     controls.enablePan = false;
-    controls.minDistance = 6.5;
+    controls.minDistance = 6.0;
     controls.maxDistance = 32.0;
     controls.maxPolarAngle = Math.PI * 0.72;
     controls.minPolarAngle = Math.PI * 0.18;
     controls.minAzimuthAngle = -Math.PI * 0.35;
     controls.maxAzimuthAngle = Math.PI * 0.35;
-    controls.target.set(0, initTargetY, isPortrait && gamePhaseRef.current !== 'playing' ? 2.2 : 0);
+    controls.target.set(
+      0,
+      layoutRef.current.targetY,
+      isPortrait && gamePhaseRef.current !== 'playing' ? 2.2 : 0
+    );
     controls.update();
 
     let userOrbiting = false;
@@ -448,26 +694,18 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     // 6a. 3D Digital LED Readout Plaque (Top-Left of Workbench)
     const readoutPlaque = create3DReadoutPlaque(maxAnisotropy);
-    if (isPortrait) {
-      readoutPlaque.group.position.set(-1.45, 4.85, 0.06);
-      readoutPlaque.group.scale.set(0.85, 0.85, 0.85);
-    }
     topHud3DGroup.add(readoutPlaque.group);
 
     // 6b. 3D Physical Target Collector Trays (Top-Center of Workbench)
     const targetTray0 = create3DTargetBoxTray(0);
     const targetTray1 = create3DTargetBoxTray(1);
-    if (isPortrait) {
-      targetTray0.group.position.set(-1.05, 3.65, 0.06);
-      targetTray1.group.position.set(1.05, 3.65, 0.06);
-    }
     topHud3DGroup.add(targetTray0.group, targetTray1.group);
 
     // 6c. Physical 3D Mechanical Push-Buttons on Workbench Rails
     // Top-Right Utility 3D Buttons (SOUND PACK MENU, MUTE, PAUSE)
     const soundMenuBtn3D = create3DControlButton(
-      isPortrait ? 0.85 : 2.7,
-      isPortrait ? 4.85 : 3.65,
+      2.7,
+      3.65,
       0.08,
       0.62,
       0.72,
@@ -475,8 +713,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       maxAnisotropy
     );
     const muteBtn3D = create3DControlButton(
-      isPortrait ? 1.7 : 3.55,
-      isPortrait ? 4.85 : 3.65,
+      3.55,
+      3.65,
       0.08,
       0.6,
       0.72,
@@ -484,19 +722,14 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       maxAnisotropy
     );
     const pauseBtn3D = create3DControlButton(
-      isPortrait ? 2.55 : 4.4,
-      isPortrait ? 4.85 : 3.65,
+      4.4,
+      3.65,
       0.08,
       0.6,
       0.72,
       { type: 'pause_toggle' },
       maxAnisotropy
     );
-    if (isPortrait) {
-      soundMenuBtn3D.group.scale.set(0.85, 0.85, 0.85);
-      muteBtn3D.group.scale.set(0.85, 0.85, 0.85);
-      pauseBtn3D.group.scale.set(0.85, 0.85, 0.85);
-    }
     topHud3DGroup.add(
       soundMenuBtn3D.group,
       muteBtn3D.group,
@@ -553,10 +786,6 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     // 6c-right. Right-Side 3D Radioactive Liquid Auto-Play Reactor Vessel & Activator
     const autoPlayRig = create3DRadioactiveAutoPlayRig(maxAnisotropy);
-    if (isPortrait) {
-      autoPlayRig.group.position.set(2.8, -1.5, 0.12);
-      autoPlayRig.group.scale.set(0.72, 0.72, 0.72);
-    }
     gui3DGroup.add(autoPlayRig.group);
 
     const workbenchButtons3D: Button3DHandle[] = [
@@ -580,10 +809,6 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     // 6e. 3D Diegetic Modal Stage (Title / Pause / Victory / Defeat / Sound Settings / PGS / Recap / Conflict)
     const modal3D = create3DDiegeticModalStage(maxAnisotropy);
-    if (isPortrait) {
-      modal3D.root.position.set(0, 0.45, 2.2);
-      modal3D.root.scale.set(0.88, 0.88, 0.88);
-    }
     scene.add(modal3D.root);
 
     // 6e-banners. 3D Contextual FTUE Hint Plinth & New-Tool Unlock Plaque
@@ -593,33 +818,86 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     let hintPlaqueBlend = 0;
     let toolPlaqueBlend = 0;
 
-    // 6f. Dual 3D Native Ad Billboards (Flanking Left & Right Workbench in Empty Lateral Space)
+    // 6f. Dual 3D Native Ad Billboards (Disabled so 100% of screen is utilized by game & UI)
     const nativeAdsGroup = new THREE.Group();
     nativeAdsGroup.name = 'native_ads_billboards';
+    nativeAdsGroup.visible = false;
     scene.add(nativeAdsGroup);
 
     const leftAdBillboard = create3DNativeAdBillboard('left', maxAnisotropy);
     const rightAdBillboard = create3DNativeAdBillboard('right', maxAnisotropy);
+    leftAdBillboard.group.visible = false;
+    rightAdBillboard.group.visible = false;
     nativeAdsGroup.add(leftAdBillboard.group, rightAdBillboard.group);
 
-    const updateBillboardLayout = (wAspect: number) => {
-      const isPort = wAspect < 1.0;
-      const isNative = Capacitor.isNativePlatform();
-      // On native Android, real Google AdMob NativeAdView cards are displayed by MainActivity
-      // In web browser preview mode, procedural 3D billboards are displayed
-      leftAdBillboard.group.visible = !isPort && !isNative;
-      rightAdBillboard.group.visible = !isPort && !isNative;
-      if (!isPort && !isNative) {
-        const halfWidth = 4.72 * wAspect;
-        const adCenterX = Math.min(7.6, Math.max(6.65, (5.35 + halfWidth) * 0.5));
-        const adScale = Math.min(1.0, Math.max(0.78, (halfWidth - 5.35) / 3.2));
-        leftAdBillboard.group.position.x = -adCenterX;
-        leftAdBillboard.group.scale.setScalar(adScale);
-        rightAdBillboard.group.position.x = adCenterX;
-        rightAdBillboard.group.scale.setScalar(adScale);
+    const dockHoleMeshes: THREE.Mesh[] = [];
+    const dockHoleInnerMeshes: THREE.Mesh[] = [];
+
+    const applyViewportLayout = (ly: ViewportLayout) => {
+      const setWbLayout = workbenchGroup.userData.setWorkbenchLayout as
+        | ((
+            visW: number,
+            visH: number,
+            centerY: number,
+            dockY: number,
+            dockScaleX: number,
+            dockScaleY: number
+          ) => void)
+        | undefined;
+      setWbLayout?.(
+        ly.frameVisW,
+        ly.frameVisH,
+        ly.centerY,
+        ly.dockY,
+        ly.dockScaleX,
+        ly.dockScaleY
+      );
+
+      readoutPlaque.group.position.set(ly.plaqueX, ly.plaqueY, 0.06);
+      readoutPlaque.group.scale.setScalar(ly.plaqueScale);
+
+      targetTray0.group.position.set(ly.tray0X, ly.trayY, 0.06);
+      targetTray0.group.scale.setScalar(ly.trayScale);
+      targetTray1.group.position.set(ly.tray1X, ly.trayY, 0.06);
+      targetTray1.group.scale.setScalar(ly.trayScale);
+
+      soundMenuBtn3D.group.position.set(ly.soundBtnX, ly.utilBtnY, 0.08);
+      soundMenuBtn3D.group.scale.setScalar(ly.utilScale);
+      muteBtn3D.group.position.set(ly.muteBtnX, ly.utilBtnY, 0.08);
+      muteBtn3D.group.scale.setScalar(ly.utilScale);
+      pauseBtn3D.group.position.set(ly.pauseBtnX, ly.utilBtnY, 0.08);
+      pauseBtn3D.group.scale.setScalar(ly.utilScale);
+
+      for (let i = 0; i < 4; i++) {
+        powerUpDeckButtons3D[i].group.position.set(
+          ly.deckBtnX[i],
+          ly.botDeckY,
+          0.1
+        );
+        powerUpDeckButtons3D[i].group.scale.setScalar(ly.deckBtnScale);
+      }
+
+      autoPlayRig.group.position.set(ly.reactorX, ly.reactorY, 0.12);
+      autoPlayRig.group.scale.setScalar(ly.reactorScale);
+
+      modal3D.root.position.set(0, ly.isPortrait ? 0.35 : 0.15, 2.2);
+      modal3D.root.scale.setScalar(ly.modalScale);
+
+      leftAdBillboard.group.visible = false;
+      rightAdBillboard.group.visible = false;
+
+      const maxSlots = boardRef.current.maxDockSlots;
+      for (let i = 0; i < dockHoleMeshes.length; i++) {
+        const sx = getDockSlotWorldX(i, maxSlots) * ly.dockScaleX;
+        dockHoleMeshes[i].position.set(sx, ly.dockY, 0.13);
+        dockHoleMeshes[i].scale.setScalar(ly.dockRingScale);
+        if (dockHoleInnerMeshes[i]) {
+          dockHoleInnerMeshes[i].position.set(sx, ly.dockY, 0.085);
+          dockHoleInnerMeshes[i].scale.setScalar(ly.dockRingScale);
+        }
       }
     };
-    updateBillboardLayout(initAspect);
+    applyViewportLayout(layoutRef.current);
 
     const isHierarchyVisible = (obj: THREE.Object3D | null): boolean => {
       let cur: THREE.Object3D | null = obj;
@@ -649,14 +927,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       autoPlayRig.group.visible = autoPlayUnlocked;
       autoPlayRig.buttonHandle.group.visible = autoPlayUnlocked;
 
-      const webNativeAdsAllowed = isControlUnlocked('nativeAds', curHighestLvl, curFtue, ftueGateOpts);
-      if (!Capacitor.isNativePlatform() && camera.aspect >= 1.0) {
-        leftAdBillboard.group.visible = webNativeAdsAllowed;
-        rightAdBillboard.group.visible = webNativeAdsAllowed;
-      } else {
-        leftAdBillboard.group.visible = false;
-        rightAdBillboard.group.visible = false;
-      }
+      leftAdBillboard.group.visible = false;
+      rightAdBillboard.group.visible = false;
       return {
         showStreakCard: isControlUnlocked('streakCard', curHighestLvl, curFtue, ftueGateOpts),
       };
@@ -674,8 +946,11 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     const screwAnims = new Map<string, ScrewAnimData>();
     const plateAnims = new Map<string, PlateAnimData>();
-    const dockHoleMeshes: THREE.Mesh[] = [];
     const interactableScrewTargets: THREE.Object3D[] = [];
+
+    const mapBoardX = (lx: number) => lx * layoutRef.current.boardSpreadX;
+    const mapBoardY = (ly: number) =>
+      ly * layoutRef.current.boardSpreadY + layoutRef.current.boardOffsetY;
 
     function buildLevelScene(withEntrance = true) {
       while (levelGroup.children.length > 0) {
@@ -684,17 +959,22 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       screwAnims.clear();
       plateAnims.clear();
       dockHoleMeshes.length = 0;
+      dockHoleInnerMeshes.length = 0;
       interactableScrewTargets.length = 0;
 
       const currentBoard = boardRef.current;
+      const ly = layoutRef.current;
+      const sx = ly.boardSpreadX;
+      const sy = ly.boardSpreadY;
+      const bs = ly.boltBaseScale;
 
-      // Build Spare Dock Socket Rings (up to 8 slots at y = 2.65)
+      // Build Spare Dock Socket Rings (up to 8 slots at ly.dockY)
       const socketRingGeo = new THREE.TorusGeometry(0.32, 0.052, 16, 32);
       const socketHoleGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.1, 24);
       socketHoleGeo.rotateX(Math.PI / 2);
 
       for (let i = 0; i < 8; i++) {
-        const slotX = getDockSlotWorldX(i, currentBoard.maxDockSlots);
+        const slotX = getDockSlotWorldX(i, currentBoard.maxDockSlots) * ly.dockScaleX;
         const ringMat = new THREE.MeshPhysicalMaterial({
           color: i < currentBoard.maxDockSlots ? 0xe5a93c : 0x38bdf8,
           roughness: 0.16,
@@ -703,16 +983,19 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           envMapIntensity: 2.0,
         });
         const ring = new THREE.Mesh(socketRingGeo, ringMat);
-        ring.position.set(slotX, 2.65, 0.13);
+        ring.position.set(slotX, ly.dockY, 0.13);
+        ring.scale.setScalar(ly.dockRingScale);
         ring.visible = i < currentBoard.maxDockSlots;
         levelGroup.add(ring);
         dockHoleMeshes.push(ring);
 
         const holeMat = new THREE.MeshBasicMaterial({ color: 0x070a10 });
         const hole = new THREE.Mesh(socketHoleGeo, holeMat);
-        hole.position.set(slotX, 2.65, 0.085);
+        hole.position.set(slotX, ly.dockY, 0.085);
+        hole.scale.setScalar(ly.dockRingScale);
         hole.visible = i < currentBoard.maxDockSlots;
         levelGroup.add(hole);
+        dockHoleInnerMeshes.push(hole);
       }
 
       // Build Plates with subtle per-plate Z sub-offset & smooth level-start 3D drop-in entrance
@@ -721,7 +1004,10 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         for (const sId of plateState.initialScrewIds) {
           const s = currentBoard.screws.find((sc) => sc.id === sId);
           if (s) {
-            holeCoords.push({ x: s.x - plateState.x, y: s.y - plateState.y });
+            holeCoords.push({
+              x: (s.x - plateState.x) * sx,
+              y: (s.y - plateState.y) * sy,
+            });
           }
         }
 
@@ -730,21 +1016,34 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           ? plateZ + 0.32 + plateState.layer * 0.08
           : plateZ;
         const pivotGroup = new THREE.Group();
-        pivotGroup.position.set(plateState.pivotX, plateState.pivotY, startZ);
+        pivotGroup.position.set(
+          mapBoardX(plateState.pivotX),
+          mapBoardY(plateState.pivotY),
+          startZ
+        );
+
+        const visPlateW = Math.max(
+          0.88 * bs,
+          Math.max(0, plateState.width - 0.88) * sx + 0.88 * bs
+        );
+        const visPlateH = Math.max(
+          0.88 * bs,
+          Math.max(0, plateState.height - 0.88) * sy + 0.88 * bs
+        );
 
         const plateGroup = createCompositePlateGroup(
           plateState.id,
           plateState.shape,
           plateState.materialType,
-          plateState.width,
-          plateState.height,
+          visPlateW,
+          visPlateH,
           holeCoords,
           isSoftwareGl,
           brushedBumpMap
         );
         plateGroup.position.set(
-          plateState.x - plateState.pivotX,
-          plateState.y - plateState.pivotY,
+          (plateState.x - plateState.pivotX) * sx,
+          (plateState.y - plateState.pivotY) * sy,
           0
         );
         pivotGroup.add(plateGroup);
@@ -776,18 +1075,19 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           : initZ;
         const startSpin = withEntrance ? Math.PI * 2.0 : 0;
 
-        screwGroup.position.set(screwState.x, screwState.y, startZ);
+        const wx = mapBoardX(screwState.x);
+        const wy = mapBoardY(screwState.y);
+
+        screwGroup.position.set(wx, wy, startZ);
         screwGroup.rotation.set(0, 0, startSpin);
-        if (withEntrance) {
-          screwGroup.scale.setScalar(0.75);
-        }
+        screwGroup.scale.setScalar(withEntrance ? 0.75 * bs : bs);
         levelGroup.add(screwGroup);
         interactableScrewTargets.push(screwGroup);
 
         screwAnims.set(screwState.id, {
           group: screwGroup,
-          currX: screwState.x,
-          currY: screwState.y,
+          currX: wx,
+          currY: wy,
           currZ: startZ,
           spinZ: startSpin,
           shakeTimer: 0,
@@ -868,9 +1168,10 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     triggerPowerUpAnimRef.current = (slotIdx: PowerUpSlotIndex) => {
       resetIdleTimer(idleHandState);
       triggerPowerUpActivation3D(levelTrans, slotIdx);
-      const bx = POWERUP_BUTTON_POS_X[slotIdx] ?? 0;
+      const bx = layoutRef.current.deckBtnX[slotIdx] ?? 0;
+      const by = layoutRef.current.botDeckY;
       const color = POWERUP_SPARK_COLORS[slotIdx] ?? '#F59E0B';
-      particleSystem.emitBolt(bx, -3.35, 0.35, color, 16, 4);
+      particleSystem.emitBolt(bx, by, 0.35, color, 16, 4);
     };
 
     let hoveredScrewId: string | null = null;
@@ -883,10 +1184,18 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       resetIdleTimer(idleHandState);
       const b = boardRef.current;
       const spacing = explodedPeekRef.current ? 0.56 : 0.28;
+      const ly = layoutRef.current;
 
       if (feedback.type === 'extra-slot') {
         triggerPowerUpAnimRef.current?.(1);
-        particleSystem.emitBolt(2.25, 2.65, 0.3, '#38BDF8', 24, 8);
+        particleSystem.emitBolt(
+          2.25 * ly.dockScaleX,
+          ly.dockY,
+          0.3,
+          '#38BDF8',
+          24,
+          8
+        );
         return;
       }
 
@@ -911,7 +1220,11 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             const meta = SCREW_COLOR_META[s.color];
             if (feedback.type === 'hammer') {
               hammerStrikeTimer = 0.34;
-              hammerStrikePos.set(s.x, s.y, s.layer * 0.28 + 0.35);
+              hammerStrikePos.set(
+                mapBoardX(s.x),
+                mapBoardY(s.y),
+                s.layer * 0.28 + 0.35
+              );
               triggerAuxiliaryShake(screenShake, 'hammer');
             }
             const isHeavy =
@@ -924,7 +1237,14 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
               isHeavy ? 24 : 12,
               isHeavy ? 8 : 3
             );
-            particleSystem.emitBolt(4.36, 0.12, 0.45, '#39FF14', 10, 2);
+            particleSystem.emitBolt(
+              ly.reactorX,
+              ly.reactorY + 0.15,
+              0.45,
+              '#39FF14',
+              10,
+              2
+            );
           }
         }
 
@@ -946,8 +1266,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         if (boxesCleared > 0 || feedback.type === 'box-cleared') {
           triggerBoxCompleteShake(screenShake, Math.max(1, boxesCleared));
           boxCompletePopTimer = 0.42;
-          particleSystem.emitBolt(-0.78, 3.65, 0.38, '#FDE047', 18, 5);
-          particleSystem.emitBolt(0.95, 3.65, 0.38, '#38BDF8', 18, 5);
+          particleSystem.emitBolt(ly.tray0X, ly.trayY, 0.38, '#FDE047', 18, 5);
+          particleSystem.emitBolt(ly.tray1X, ly.trayY, 0.38, '#38BDF8', 18, 5);
         }
 
         if (feedback.levelWon || b.outcome === 'victory') {
@@ -1148,24 +1468,37 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     domElem.addEventListener('pointerdown', handlePointerDown);
     domElem.addEventListener('pointerup', handlePointerUp);
 
-    // 11. ResizeObserver for Live World Projection
+    // 11. ResizeObserver for Live Full-Viewport World Projection
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
           const newAspect = width / height;
-          const isPort = newAspect < 1.0;
+          const prevSpreadX = layoutRef.current.boardSpreadX;
+          const prevSpreadY = layoutRef.current.boardSpreadY;
+          const nextLayout = computeViewportLayout(newAspect);
+          layoutRef.current = nextLayout;
+
           camera.aspect = newAspect;
           camera.updateProjectionMatrix();
-          updateBillboardLayout(newAspect);
-          const zoomZ = isPort
-            ? Math.min(20.0, Math.max(13.5, 7.6 / Math.max(0.38, newAspect)))
-            : (newAspect < 1.15 ? 11.4 * (1.18 / Math.max(0.7, newAspect)) : 11.8);
+          applyViewportLayout(nextLayout);
+
+          if (
+            Math.abs(nextLayout.boardSpreadX - prevSpreadX) > 0.01 ||
+            Math.abs(nextLayout.boardSpreadY - prevSpreadY) > 0.01
+          ) {
+            buildLevelScene(false);
+          }
+
           if (!userOrbiting) {
-            const targetY = isPort ? (gamePhaseRef.current === 'playing' ? 0.65 : 0.45) : 0.15;
-            const camY = isPort ? (gamePhaseRef.current === 'playing' ? -0.15 : 0.45) : -0.55;
-            camera.position.set(0, camY, zoomZ);
-            controls.target.set(0, targetY, isPort && gamePhaseRef.current !== 'playing' ? 2.2 : 0);
+            camera.position.set(0, nextLayout.camY, nextLayout.zoomZ);
+            controls.target.set(
+              0,
+              nextLayout.targetY,
+              nextLayout.isPortrait && gamePhaseRef.current !== 'playing'
+                ? 2.2
+                : 0
+            );
             camera.lookAt(controls.target);
           }
           renderer.setSize(width, height);
@@ -1231,15 +1564,17 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       const isExploded = explodedPeekRef.current;
       const layerSpacing = isExploded ? 0.36 : 0.14;
 
+      const ly = layoutRef.current;
+
       // Step 3D Level Transition & Sequential Power-Up Charge Wave
       stepLevelTransition3D(
         levelTrans,
         phase,
         dt,
         (slotIdx) => {
-          const bx = POWERUP_BUTTON_POS_X[slotIdx] ?? 0;
+          const bx = ly.deckBtnX[slotIdx] ?? 0;
           const color = POWERUP_SPARK_COLORS[slotIdx] ?? '#F59E0B';
-          particleSystem.emitBolt(bx, -3.35, 0.32, color, 12, 3);
+          particleSystem.emitBolt(bx, ly.botDeckY, 0.32, color, 12, 3);
         },
         isAnyModalOpen
       );
@@ -1253,7 +1588,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       bottomDeck3DGroup.visible = !isAnyModalOpen;
 
       // Smoothly animate 3D Contextual FTUE Hint Plinth & New-Tool Unlock Plaque
-      const isPortNowForHud = (camera.aspect || 1) < 1.0;
+      const isPortNowForHud = ly.isPortrait;
       const curHint = hintTextRef.current;
       const wantHintPlaque =
         Boolean(curHint) && phase === 'playing' && !isAnyModalOpen;
@@ -1268,14 +1603,10 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       );
       ftueHintPlinth.group.visible = hintPlaqueBlend > 0.02;
       if (ftueHintPlinth.group.visible) {
-        const hintBaseY = isPortNowForHud
-          ? hasBottomBoostersRef.current
-            ? -2.42
-            : -3.55
-          : hasBottomBoostersRef.current
-            ? -2.62
-            : -3.48;
-        const hintScale = isPortNowForHud ? 0.78 : 1.0;
+        const hintBaseY = hasBottomBoostersRef.current
+          ? ly.botDeckY + 0.66 * ly.deckBtnScale
+          : ly.botDeckY + 0.12;
+        const hintScale = isPortNowForHud ? 0.85 : Math.min(1.18, ly.deckBtnScale * 0.92);
         ftueHintPlinth.group.position.set(
           0,
           hintBaseY - (1 - hintPlaqueBlend) * 0.24,
@@ -1300,12 +1631,12 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       );
       newToolPlaque.group.visible = toolPlaqueBlend > 0.02;
       if (newToolPlaque.group.visible) {
-        const toolBaseY = isPortNowForHud ? 5.65 : 4.5;
-        const toolScale = isPortNowForHud ? 0.8 : 1.0;
+        const toolBaseY = ly.dockY + 0.45;
+        const toolScale = isPortNowForHud ? 0.85 : Math.min(1.18, ly.trayScale);
         newToolPlaque.group.position.set(
           0,
           toolBaseY + (1 - toolPlaqueBlend) * 0.24,
-          0.28
+          0.32
         );
         newToolPlaque.group.scale.setScalar(
           toolScale * Math.max(0.01, toolPlaqueBlend)
@@ -1349,17 +1680,17 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       if (boxCompletePopTimer > 0) {
         boxCompletePopTimer = Math.max(0, boxCompletePopTimer - dt);
         const popPhase = 1 - boxCompletePopTimer / 0.42;
-        const popBounce = 1 + Math.sin(popPhase * Math.PI) * 0.14;
-        const popZ = Math.sin(popPhase * Math.PI) * 0.16;
+        const popBounce = ly.trayScale * (1 + Math.sin(popPhase * Math.PI) * 0.14);
+        const popZ = 0.06 + Math.sin(popPhase * Math.PI) * 0.16;
         targetTray0.group.scale.setScalar(popBounce);
         targetTray1.group.scale.setScalar(popBounce);
         targetTray0.group.position.z = popZ;
         targetTray1.group.position.z = popZ;
       } else {
-        targetTray0.group.scale.setScalar(1);
-        targetTray1.group.scale.setScalar(1);
-        targetTray0.group.position.z = 0;
-        targetTray1.group.position.z = 0;
+        targetTray0.group.scale.setScalar(ly.trayScale);
+        targetTray1.group.scale.setScalar(ly.trayScale);
+        targetTray0.group.position.z = 0.06;
+        targetTray1.group.position.z = 0.06;
       }
 
       // Sync 3D Workbench Push-Button Textures & Spring Depressions
@@ -1387,7 +1718,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       const extraSlotsAvailable = currentBoard.extraSlotsRemaining ?? 0;
       const hasSlotBoosters = extraSlotsAvailable > 0;
 
-      // Hammer 3D Button: shows number count when available (> 0), or video icon 🎬 when zero
+      // Hammer 3D Button: shows available count or +1 refill badge (zero ads)
       updateButton3DCapTexture(
         hammerBtn3D,
         '🔨',
@@ -1395,12 +1726,12 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           ? 'SMASH!'
           : 'HAMMER',
         currentBoard.hammerMode ? '#EF4444' : (hasHammers ? '#FDE047' : '#10B981'),
-        hasHammers ? String(currentBoard.hammersRemaining) : '🎬',
+        hasHammers ? String(currentBoard.hammersRemaining) : '+1',
         currentBoard.hammerMode,
         false
       );
 
-      // Slot 3D Button: shows number count when available (> 0), or video icon 🎬 when zero
+      // Slot 3D Button: shows available count or +1 badge (zero ads)
       if (!canExpandDock) {
         updateButton3DCapTexture(
           slotBtn3D,
@@ -1412,7 +1743,6 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           true
         );
       } else if (hasSlotBoosters) {
-        // Available slot charges: displays number count just like hammer
         updateButton3DCapTexture(
           slotBtn3D,
           '+1',
@@ -1423,13 +1753,12 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           false
         );
       } else {
-        // Zero available: shows video icon 🎬 on slot
         updateButton3DCapTexture(
           slotBtn3D,
           '+1',
           'SLOT',
           '#10B981',
-          '🎬',
+          '+1',
           false,
           false
         );
@@ -1450,7 +1779,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         '#94A3B8'
       );
 
-      // Progressive FTUE visibility gating of workbench controls and side ads
+      // Progressive FTUE visibility gating of workbench controls
       const ftueModalMeta = syncWorkbenchFtueVisibility(currentBoard.levelIndex);
 
       // Sync Right-Side 3D Radioactive Liquid Auto-Play Reactor
@@ -1464,13 +1793,9 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         dt,
         elapsed
       );
-      autoPlayRig.group.position.x = 4.36 + (1 - levelTrans.hudBlend) * 1.4;
-
-      // Update Dual 3D Native Ad Billboards (Floating wave, neon pulse, breathing tilt)
-      if (leftAdBillboard.group.visible) {
-        leftAdBillboard.update(elapsed);
-        rightAdBillboard.update(elapsed);
-      }
+      autoPlayRig.group.position.x = ly.reactorX + (1 - levelTrans.hudBlend) * 1.4;
+      autoPlayRig.group.position.y = ly.reactorY;
+      autoPlayRig.group.scale.setScalar(ly.reactorScale);
 
       for (const b of [
         ...workbenchButtons3D,
@@ -1486,7 +1811,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       for (let i = 0; i < 4; i++) {
         const btnHandle = powerUpDeckButtons3D[i];
         const animState = levelTrans.powerUpButtons[i];
-        btnHandle.group.scale.setScalar(animState.scale);
+        btnHandle.group.scale.setScalar(animState.scale * ly.deckBtnScale);
         btnHandle.group.rotation.set(animState.rotX, 0, animState.rotZ);
         btnHandle.capMesh.position.z = btnHandle.currZ + animState.zOffset;
       }
@@ -1512,7 +1837,9 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           phase === 'playing' && !isAnyModalOpen
             ? levelTrans.modalBlend * levelTrans.modalBlend
             : easeOutBack(levelTrans.modalBlend, 1.25);
-        modal3D.root.scale.setScalar(Math.max(0.01, modalEase));
+        modal3D.root.scale.setScalar(
+          Math.max(0.01, modalEase * ly.modalScale)
+        );
         modal3D.root.position.y =
           0.15 +
           Math.sin(elapsed * 2.2) * 0.05 +
@@ -1526,19 +1853,27 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       // Update dock slot visibility, position & pop animation
       for (let i = 0; i < dockHoleMeshes.length; i++) {
         const mesh = dockHoleMeshes[i];
+        const holeMesh = dockHoleInnerMeshes[i];
         const isUnlocked = i < currentBoard.maxDockSlots;
         mesh.visible = isUnlocked;
+        if (holeMesh) holeMesh.visible = isUnlocked;
         if (isUnlocked) {
-          const targetX = getDockSlotWorldX(i, currentBoard.maxDockSlots);
+          const targetX =
+            getDockSlotWorldX(i, currentBoard.maxDockSlots) * ly.dockScaleX;
           mesh.position.x += (targetX - mesh.position.x) * Math.min(1, dt * 12);
+          mesh.position.y = ly.dockY;
+          if (holeMesh) {
+            holeMesh.position.x = mesh.position.x;
+            holeMesh.position.y = ly.dockY;
+          }
         }
         if (i >= 5 && mesh.visible && levelTrans.extraSlotPopTimer > 0) {
           const p = 1 - levelTrans.extraSlotPopTimer / 0.55;
-          const s = easeOutBack(p, 2.2);
+          const s = easeOutBack(p, 2.2) * ly.dockRingScale;
           mesh.scale.setScalar(Math.max(0.05, s));
           mesh.rotation.z = (1 - p) * Math.PI * 2;
         } else {
-          mesh.scale.setScalar(1);
+          mesh.scale.setScalar(ly.dockRingScale);
           mesh.rotation.z = 0;
         }
       }
@@ -1618,52 +1953,48 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         screenShake.rollZ * 0.45
       );
 
-      // Camera Choreography (Responsive to Portrait Mobile & Landscape Desktop)
-      const aspect = camera.aspect || 1;
-      const isPortraitNow = aspect < 1.0;
-
-      const baseZoomZ = isPortraitNow
-        ? Math.min(20.0, Math.max(13.5, 7.6 / Math.max(0.38, aspect)))
-        : (aspect < 1.15 ? 11.4 * (1.18 / Math.max(0.7, aspect)) : 11.8);
+      // Camera Choreography (Responsive Full-Screen Fitting across All Device Sizes)
+      const isPortraitNow = ly.isPortrait;
+      const baseZoomZ = ly.zoomZ;
 
       if (phase !== 'playing' || isAnyModalOpen) {
         // Modal / Title Screen Camera
         const modalCameraZ = isPortraitNow
-          ? Math.min(18.5, Math.max(13.8, 7.2 / Math.max(0.38, aspect)))
-          : 11.6;
+          ? Math.max(13.8, ly.zoomZ * 0.96)
+          : ly.zoomZ;
 
         const parallaxX =
-          ((pointerClientX / Math.max(1, window.innerWidth)) - 0.5) * (isPortraitNow ? 0.25 : 0.6);
+          ((pointerClientX / Math.max(1, window.innerWidth)) - 0.5) * (isPortraitNow ? 0.25 : 0.45);
         const parallaxY =
-          ((pointerClientY / Math.max(1, window.innerHeight)) - 0.5) * (isPortraitNow ? 0.2 : 0.4);
+          ((pointerClientY / Math.max(1, window.innerHeight)) - 0.5) * (isPortraitNow ? 0.2 : 0.32);
 
-        const targetY = isPortraitNow ? 0.45 : -0.55;
+        const targetY = isPortraitNow ? 0.35 : ly.camY;
 
         _targetPos.set(
-          Math.sin(elapsed * 0.5) * 0.2 +
+          Math.sin(elapsed * 0.5) * 0.16 +
           parallaxX +
           screenShake.offsetX * 0.4,
           targetY +
-          Math.cos(elapsed * 0.4) * 0.15 -
+          Math.cos(elapsed * 0.4) * 0.12 -
           parallaxY +
           screenShake.offsetY * 0.4,
           modalCameraZ
         );
         camera.position.lerp(_targetPos, 1 - Math.exp(-5 * dt));
         controls.target.lerp(
-          _vec3.set(0, isPortraitNow ? 0.45 : 0.15, isPortraitNow ? 2.2 : 0.5),
+          _vec3.set(0, isPortraitNow ? 0.35 : ly.targetY, isPortraitNow ? 2.2 : 0.5),
           1 - Math.exp(-5 * dt)
         );
         camera.lookAt(controls.target);
       } else if (!userOrbiting) {
         const preset = cameraPresetRef.current;
-        const targetY = isPortraitNow ? -0.15 : -0.55;
-        const lookY = isPortraitNow ? 0.55 : 0.15;
+        const targetY = ly.camY;
+        const lookY = ly.targetY;
 
         if (isExploded || preset === 'angled') {
-          _targetPos.set(isPortraitNow ? 1.5 : 2.2, isPortraitNow ? -1.8 : -3.2, baseZoomZ);
+          _targetPos.set(isPortraitNow ? 1.5 : 2.0, isPortraitNow ? -1.8 : -2.8, baseZoomZ);
         } else if (preset === 'side') {
-          _targetPos.set(isPortraitNow ? -2.2 : -3.4, isPortraitNow ? -1.2 : -2.0, baseZoomZ * 0.95);
+          _targetPos.set(isPortraitNow ? -2.2 : -3.0, isPortraitNow ? -1.2 : -1.8, baseZoomZ * 0.96);
         } else {
           _targetPos.set(0, targetY, baseZoomZ);
         }
@@ -1716,6 +2047,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
         const targetZ = plateState.layer * layerSpacing + (pIdx % 3) * 0.015;
         anim.currZ = THREE.MathUtils.damp(anim.currZ, targetZ, 16, simDt);
+        const pvx = mapBoardX(plateState.pivotX);
+        const pvy = mapBoardY(plateState.pivotY);
 
         if (plateState.status === 'cleared') {
           if (!anim.clearedDone) {
@@ -1724,8 +2057,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             anim.fallY += anim.fallVelY * simDt;
             anim.fallRotX += 3.5 * simDt;
             anim.pivotGroup.position.set(
-              plateState.pivotX,
-              plateState.pivotY + anim.fallY,
+              pvx,
+              pvy + anim.fallY,
               anim.currZ
             );
             anim.pivotGroup.rotation.set(anim.fallRotX, 0, anim.currRotZ);
@@ -1733,8 +2066,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             if (prevFallY >= -3.2 && anim.fallY < -3.2) {
               triggerPlateDropShake(screenShake, 1);
               particleSystem.emitBolt(
-                plateState.pivotX,
-                -3.35,
+                pvx,
+                ly.botDeckY,
                 0.28,
                 '#F59E0B',
                 16,
@@ -1754,13 +2087,13 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           anim.fallRotX = 0;
 
           anim.pivotGroup.position.set(
-            plateState.pivotX,
-            plateState.pivotY,
+            pvx,
+            pvy,
             anim.currZ
           );
           anim.plateGroup.position.set(
-            plateState.x - plateState.pivotX,
-            plateState.y - plateState.pivotY,
+            (plateState.x - plateState.pivotX) * ly.boardSpreadX,
+            (plateState.y - plateState.pivotY) * ly.boardSpreadY,
             0
           );
 
@@ -1778,17 +2111,17 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         const anim = screwAnims.get(screwState.id);
         if (!anim) continue;
 
-        let tx = screwState.x;
-        let ty = screwState.y;
+        let tx = mapBoardX(screwState.x);
+        let ty = mapBoardY(screwState.y);
         let tz = screwState.layer * layerSpacing + 0.09;
-        let targetScale = 1.0;
+        let targetScale = ly.boltBaseScale;
 
         if (screwState.location === 'dock') {
           const dSlot = screwState.dockSlotIndex ?? 0;
-          tx = getDockSlotWorldX(dSlot, currentBoard.maxDockSlots);
-          ty = 2.66;
+          tx = getDockSlotWorldX(dSlot, currentBoard.maxDockSlots) * ly.dockScaleX;
+          ty = ly.dockY + 0.01;
           tz = 0.06;
-          targetScale = currentBoard.maxDockSlots > 6 ? 0.72 : 0.78;
+          targetScale = (currentBoard.maxDockSlots > 6 ? 0.72 : 0.78) * ly.dockRingScale;
         } else if (screwState.location === 'box') {
           const activeBoxIdx = currentBoard.activeBoxes.findIndex(
             (b) => b.id === screwState.targetBoxId && !b.completed
@@ -1801,7 +2134,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             tx = sockPos.x;
             ty = sockPos.y;
             tz = sockPos.z;
-            targetScale = 0.62;
+            targetScale = 0.62 * ly.trayScale;
           } else {
             tx = 0;
             ty = 5.4;
@@ -2086,8 +2419,8 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           currentBoard.screws.find(
             (s) => s.id === targetId && s.location === 'board'
           ) || currentBoard.screws.find((s) => s.location === 'board');
-        const hx = (targetScrew ? targetScrew.x : 0) + 0.52;
-        const hy = (targetScrew ? targetScrew.y : 0) - 0.22;
+        const hx = (targetScrew ? mapBoardX(targetScrew.x) : 0) + 0.52;
+        const hy = (targetScrew ? mapBoardY(targetScrew.y) : 0) - 0.22;
         const hz =
           (targetScrew ? targetScrew.layer * layerSpacing : 0.5) +
           0.75 +

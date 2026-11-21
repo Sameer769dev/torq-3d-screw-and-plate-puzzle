@@ -316,8 +316,8 @@ export default function TorqGame() {
   );
 
   useEffect(() => {
-    cloudSaveManager.setNativeAdsVisible(nativeAdsUnlocked);
-  }, [nativeAdsUnlocked]);
+    cloudSaveManager.setNativeAdsVisible(false);
+  }, []);
 
   useEffect(() => {
     setHighestLevelIndex((prev) => Math.max(prev, board.levelIndex));
@@ -631,16 +631,11 @@ export default function TorqGame() {
     });
   }, []);
 
-  // Seamless Endless Progression & Gated Interstitials (100% Automatic Background Cloud Save)
+  // Seamless Endless Progression (100% Automatic Background Cloud Save, Zero Ad Interruptions)
   useEffect(() => {
     if (gamePhase !== 'playing' || board.outcome !== 'victory') {
       return;
     }
-
-    adsManager.showLevelCompleteInterstitial(board.levelIndex, {
-      completed: ftueStateRef.current.completed,
-      sessionCount: ftueStateRef.current.sessionCount,
-    });
 
     const timer = window.setTimeout(() => {
       advanceFromWonBoard();
@@ -933,12 +928,10 @@ export default function TorqGame() {
   );
 
   const handleRefillHammerAd = useCallback(async () => {
-    const rewarded = await adsManager.showRewarded('hammer_refill');
-    if (rewarded) {
-      setBoard((prev) => refillHammerCount(prev, 1));
-      soundEngine.playUiConfirm();
-      setSoundState(soundEngine.getState());
-    }
+    hapticsEngine.pulseButtonTap();
+    setBoard((prev) => toggleHammerMode(refillHammerCount(prev, 1)));
+    soundEngine.playToolActivate('hammer_arm');
+    setSoundState(soundEngine.getState());
   }, []);
 
   const handleHammer = useCallback(async () => {
@@ -973,24 +966,11 @@ export default function TorqGame() {
       return;
     }
 
-    if ((board.extraSlotsRemaining ?? 0) > 0) {
-      // Available slot charge: instant unlock! No ad!
-      hapticsEngine.pulseButtonTap();
-      setBoard((prev) => unlockExtraDockSlot(prev));
-      soundEngine.playToolActivate('slot_expand');
-      setSoundState(soundEngine.getState());
-      return;
-    }
-
-    // Available count is zero: watch rewarded video ad to unlock slot!
-    const rewarded = await adsManager.showRewarded('extra_slot');
-    if (rewarded) {
-      setBoard((prev) => unlockExtraDockSlot(prev));
-      soundEngine.playToolActivate('slot_expand');
-      setSoundState(soundEngine.getState());
-      hapticsEngine.pulseBoxComplete();
-    }
-  }, [board.maxDockSlots, board.extraSlotsRemaining, board.levelIndex, recordToolFirstUse]);
+    hapticsEngine.pulseButtonTap();
+    setBoard((prev) => unlockExtraDockSlot(prev));
+    soundEngine.playToolActivate('slot_expand');
+    setSoundState(soundEngine.getState());
+  }, [board.maxDockSlots, board.levelIndex, recordToolFirstUse]);
 
   const handleResolveConflict = useCallback(
     (choice: 'smart_merge' | 'keep_cloud' | 'keep_local') => {
@@ -1069,33 +1049,27 @@ export default function TorqGame() {
   }, [board.levelIndex]);
 
   const handleReviveAd = useCallback(async () => {
-    const rewarded = await adsManager.showRewarded('revive');
-    if (rewarded) {
-      setBoard((prev) => reviveBoardState(prev));
-      document.body.dataset.state = 'playing';
-      setGamePhase('playing');
-      soundEngine.playUiConfirm();
-      setSoundState(soundEngine.getState());
-    }
+    hapticsEngine.pulseLevelComplete();
+    setBoard((prev) => reviveBoardState(prev));
+    document.body.dataset.state = 'playing';
+    setGamePhase('playing');
+    soundEngine.playUiConfirm();
+    setSoundState(soundEngine.getState());
   }, []);
 
   const handleFuelAutoPlayAd = useCallback(async () => {
-    const rewarded = await adsManager.showRewarded('autoplay_fuel');
-    if (rewarded) {
-      setAutoPlay((prev) => fuelAutoPlayToFull(prev));
-      soundEngine.playUiConfirm();
-      setSoundState(soundEngine.getState());
-    }
+    hapticsEngine.pulseBoxComplete();
+    setAutoPlay((prev) => activateAutoPlay(fuelAutoPlayToFull(prev)));
+    soundEngine.playToolActivate('auto_play');
+    setSoundState(soundEngine.getState());
   }, []);
 
   const handleDoubleStreakAd = useCallback(async () => {
-    const rewarded = await adsManager.showRewarded('streak_doubler');
-    if (rewarded) {
-      setDayStreak((prev) => doubleDailyStreakBonus(prev));
-      setBestScore((prev) => prev + dayStreak.rewardBonusPoints);
-      soundEngine.playUiConfirm();
-      setSoundState(soundEngine.getState());
-    }
+    hapticsEngine.pulseLevelComplete();
+    setDayStreak((prev) => doubleDailyStreakBonus(prev));
+    setBestScore((prev) => prev + dayStreak.rewardBonusPoints);
+    soundEngine.playUiConfirm();
+    setSoundState(soundEngine.getState());
   }, [dayStreak.rewardBonusPoints]);
 
   const handlePauseToggle = useCallback(() => {

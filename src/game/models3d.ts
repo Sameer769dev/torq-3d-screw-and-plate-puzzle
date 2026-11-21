@@ -639,12 +639,11 @@ export function createWorkbenchEnvironment(
   const envGroup = new THREE.Group();
   envGroup.name = 'workbench_environment';
 
-  const boardW = isPortrait ? 6.8 : 10.6;
-  const boardH = isPortrait ? 15.2 : 7.3;
-  const boardY = isPortrait ? -0.1 : -0.3;
+  const baseW = 10.0;
+  const baseH = 10.0;
 
   // 1. Primary calibrated blueprint board surface (matte anti-glare cutting mat)
-  const boardGeo = new RoundedBoxGeometry(boardW, boardH, 0.42, 4, 0.12);
+  const boardGeo = new RoundedBoxGeometry(baseW, baseH, 0.42, 4, 0.12);
   const boardMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: workbenchTexture,
@@ -653,7 +652,7 @@ export function createWorkbenchEnvironment(
     envMapIntensity: 0.35,
   });
   const boardMesh = new THREE.Mesh(boardGeo, boardMat);
-  boardMesh.position.set(0, boardY, -0.36);
+  boardMesh.position.set(0, 0, -0.36);
   boardMesh.receiveShadow = true;
   envGroup.add(boardMesh);
 
@@ -677,48 +676,25 @@ export function createWorkbenchEnvironment(
     envMapIntensity: 1.35,
   });
 
-  const topRailY = isPortrait ? 7.35 : 3.46;
-  const botRailY = isPortrait ? -7.55 : -4.06;
-  const railW = isPortrait ? 7.3 : 11.15;
-  const railH = isPortrait ? 15.5 : 7.85;
-  const sideRailX = isPortrait ? 3.48 : 5.42;
-
   const topRail = new THREE.Mesh(
-    new RoundedBoxGeometry(railW, 0.42, 0.6, 5, 0.14),
+    new RoundedBoxGeometry(baseW, 0.42, 0.6, 5, 0.14),
     frameMat
   );
-  topRail.position.set(0, topRailY, -0.26);
   const botRail = new THREE.Mesh(
-    new RoundedBoxGeometry(railW, 0.42, 0.6, 5, 0.14),
+    new RoundedBoxGeometry(baseW, 0.42, 0.6, 5, 0.14),
     frameMat
   );
-  botRail.position.set(0, botRailY, -0.26);
   const leftRail = new THREE.Mesh(
-    new RoundedBoxGeometry(0.42, railH, 0.6, 5, 0.14),
+    new RoundedBoxGeometry(0.42, baseH, 0.6, 5, 0.14),
     frameMat
   );
-  leftRail.position.set(-sideRailX, boardY, -0.26);
   const rightRail = new THREE.Mesh(
-    new RoundedBoxGeometry(0.42, railH, 0.6, 5, 0.14),
+    new RoundedBoxGeometry(0.42, baseH, 0.6, 5, 0.14),
     frameMat
   );
-  rightRail.position.set(sideRailX, boardY, -0.26);
   envGroup.add(topRail, botRail, leftRail, rightRail);
 
   // 4 Rounded Machined Brass Corner Bumpers with decorative hex bolts
-  const cornerCoords = isPortrait
-    ? [
-        [-sideRailX + 0.07, topRailY - 0.04],
-        [sideRailX - 0.07, topRailY - 0.04],
-        [-sideRailX + 0.07, botRailY + 0.04],
-        [sideRailX - 0.07, botRailY + 0.04],
-      ]
-    : [
-        [-5.35, 3.42],
-        [5.35, 3.42],
-        [-5.35, -4.02],
-        [5.35, -4.02],
-      ];
   const cornerGeo = new RoundedBoxGeometry(0.74, 0.74, 0.68, 5, 0.18);
   const boltCapGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.08, 6);
   boltCapGeo.rotateX(Math.PI / 2);
@@ -729,17 +705,19 @@ export function createWorkbenchEnvironment(
     clearcoat: 0.35,
   });
 
-  for (const [cx, cy] of cornerCoords) {
+  const corners: THREE.Mesh[] = [];
+  const boltCaps: THREE.Mesh[] = [];
+  for (let i = 0; i < 4; i++) {
     const corner = new THREE.Mesh(cornerGeo, brassMat);
-    corner.position.set(cx, cy, -0.22);
     envGroup.add(corner);
+    corners.push(corner);
 
     const boltCap = new THREE.Mesh(boltCapGeo, boltCapMat);
-    boltCap.position.set(cx, cy, 0.13);
     envGroup.add(boltCap);
+    boltCaps.push(boltCap);
   }
 
-  // 3. Rounded Spare Holding Dock 3D Rail at y = 2.65 (Expanded to accommodate up to 8 slots)
+  // 3. Rounded Spare Holding Dock 3D Rail (Expanded to accommodate up to 8 slots)
   const dockOuterGeo = new RoundedBoxGeometry(6.3, 0.88, 0.3, 5, 0.16);
   const dockOuterMat = new THREE.MeshPhysicalMaterial({
     color: 0x161d29,
@@ -749,7 +727,7 @@ export function createWorkbenchEnvironment(
     envMapIntensity: 1.15,
   });
   const dockOuter = new THREE.Mesh(dockOuterGeo, dockOuterMat);
-  dockOuter.position.set(0, 2.65, -0.09);
+  dockOuter.position.set(0, 2.45, -0.09);
   dockOuter.receiveShadow = true;
   envGroup.add(dockOuter);
 
@@ -765,9 +743,74 @@ export function createWorkbenchEnvironment(
     bumpScale: 0.008,
   });
   const dockRail = new THREE.Mesh(dockRailGeo, dockRailMat);
-  dockRail.position.set(0, 2.65, -0.05);
+  dockRail.position.set(0, 2.45, -0.05);
   dockRail.receiveShadow = true;
   envGroup.add(dockRail);
+
+  const setWorkbenchLayout = (
+    visW: number,
+    visH: number,
+    centerY: number,
+    dockY: number,
+    dockScaleX: number,
+    dockScaleY = 1.0
+  ) => {
+    const safeW = Math.max(6.8, visW);
+    const safeH = Math.max(7.2, visH);
+    const halfW = safeW * 0.5;
+    const halfH = safeH * 0.5;
+
+    boardMesh.scale.set(safeW / baseW, safeH / baseH, 1);
+    boardMesh.position.set(0, centerY, -0.36);
+    workbenchTexture.repeat.set(
+      Math.max(2, Number((safeW / 3.4).toFixed(2))),
+      Math.max(2, Number((safeH / 3.4).toFixed(2)))
+    );
+
+    const topY = centerY + halfH - 0.16;
+    const botY = centerY - halfH + 0.16;
+    const leftX = -halfW + 0.16;
+    const rightX = halfW - 0.16;
+
+    topRail.scale.set((safeW + 0.24) / baseW, 1, 1);
+    topRail.position.set(0, topY, -0.26);
+
+    botRail.scale.set((safeW + 0.24) / baseW, 1, 1);
+    botRail.position.set(0, botY, -0.26);
+
+    leftRail.scale.set(1, (safeH + 0.24) / baseH, 1);
+    leftRail.position.set(leftX, centerY, -0.26);
+
+    rightRail.scale.set(1, (safeH + 0.24) / baseH, 1);
+    rightRail.position.set(rightX, centerY, -0.26);
+
+    const cornerPositions = [
+      [leftX + 0.06, topY - 0.05],
+      [rightX - 0.06, topY - 0.05],
+      [leftX + 0.06, botY + 0.05],
+      [rightX - 0.06, botY + 0.05],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const [cx, cy] = cornerPositions[i];
+      corners[i].position.set(cx, cy, -0.22);
+      boltCaps[i].position.set(cx, cy, 0.13);
+    }
+
+    dockOuter.position.set(0, dockY, -0.09);
+    dockOuter.scale.set(dockScaleX, dockScaleY, 1);
+    dockRail.position.set(0, dockY, -0.05);
+    dockRail.scale.set(dockScaleX, dockScaleY, 1);
+  };
+
+  envGroup.userData.setWorkbenchLayout = setWorkbenchLayout;
+  setWorkbenchLayout(
+    isPortrait ? 7.3 : 13.8,
+    isPortrait ? 15.5 : 7.85,
+    isPortrait ? 0.1 : -0.15,
+    2.45,
+    1.0,
+    1.0
+  );
 
   return envGroup;
 }

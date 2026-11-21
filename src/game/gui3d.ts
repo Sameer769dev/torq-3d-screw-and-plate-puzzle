@@ -856,10 +856,10 @@ export function create3DTargetBoxTray(slotIndex: number): {
   }
 
   function getSocketWorldPos(socketIdx: number) {
-    const sx = -0.54 + (socketIdx % 3) * 0.54;
+    const sx = (-0.54 + (socketIdx % 3) * 0.54) * group.scale.x;
     return {
-      x: baseX + sx,
-      y: baseY,
+      x: group.position.x + sx,
+      y: group.position.y,
       z: 0.19,
     };
   }
@@ -1346,7 +1346,7 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
         });
         updateButton3DCapTexture(
           primaryBtn,
-          '⚡ REVIVE · WATCH AD',
+          '⚡ REVIVE · CONTINUE',
           'CLEAR JAM & RESUME',
           '#10B981',
           undefined,
