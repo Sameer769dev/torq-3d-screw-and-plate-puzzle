@@ -426,7 +426,9 @@ export function unscrewAction(
   }
 
   const usingHammer =
-    (state.hammerMode || forceHammer) && state.hammersRemaining > 0;
+    !autoPlayExtract &&
+    (state.hammerMode || forceHammer) &&
+    state.hammersRemaining > 0;
   const bypassBlockAndJam = usingHammer || autoPlayExtract;
 
   // Check if obstructed by a higher-layer plate (bypassed when using Hammer or Auto-Play!)
@@ -526,12 +528,22 @@ export function unscrewAction(
           defeatReason: 'Spare holding dock is full!',
         };
       }
-      // If using Hammer or Auto-Play when dock is full, expand dock by 1 slot so extraction always succeeds
-      nextDock.push(screw.id);
-      screw.location = 'dock';
-      screw.dockSlotIndex = nextDock.length - 1;
-      screw.extractedAtMove = state.movesCount + 1;
-      nextScore += 45;
+      if (autoPlayExtract) {
+        // Auto-Play reactor override: bank bolt for its matching Target Box without inflating player's dock size
+        screw.location = 'box';
+        screw.dockSlotIndex = undefined;
+        screw.targetBoxId = undefined;
+        screw.targetBoxSlot = undefined;
+        screw.extractedAtMove = state.movesCount + 1;
+        nextScore += 45;
+      } else {
+        // Hammer smash when dock is full: expand dock by 1 slot so extraction always succeeds
+        nextDock.push(screw.id);
+        screw.location = 'dock';
+        screw.dockSlotIndex = nextDock.length - 1;
+        screw.extractedAtMove = state.movesCount + 1;
+        nextScore += 45;
+      }
     } else {
       nextDock[freeDockIdx] = screw.id;
       screw.location = 'dock';
@@ -639,7 +651,7 @@ export function unscrewAction(
   if (remainingBoardScrews.length === 0 && allBoxesDone) {
     outcome = 'victory';
     nextScore += 500;
-  } else if (dockFull && !usingHammer) {
+  } else if (dockFull && !bypassBlockAndJam) {
     outcome = 'defeat';
     defeatReason = 'All spare dock holes are jammed with non-matching bolts!';
   }

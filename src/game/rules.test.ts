@@ -995,4 +995,65 @@ test('Responsive 3D viewport layout prevents overlap between Puzzle Board, Hint 
   }
 });
 
+test('Auto-Play solves levels 0..19 AND nearly-jammed mid-level boards (4/5 dock full) with 100% perfection and zero defeats', () => {
+  // 1. Fresh full-level Auto-Play across 20 consecutive depths (including Level 10+ chaotic/rainbow/unknown bolts)
+  for (let depth = 0; depth < 20; depth++) {
+    let board = createEndlessBoard(depth);
+    const startHammers = board.hammersRemaining;
+    const startMaxDock = board.maxDockSlots;
+    let steps = 0;
+    while (board.outcome === 'ongoing' && steps < 40) {
+      const nextId = pickNextAutoPlayScrewId(board);
+      assert.ok(nextId, `Depth ${depth} step ${steps}: Auto-Play must always pick a next bolt`);
+      board = unscrewAction(board, nextId, false, true);
+      assert.notEqual(board.outcome, 'defeat', `Depth ${depth}: Auto-Play must never trigger defeat`);
+      steps++;
+    }
+    assert.equal(board.outcome, 'victory', `Depth ${depth}: Auto-Play must solve cleanly to victory`);
+    assert.equal(board.hammersRemaining, startHammers, `Depth ${depth}: Auto-Play must never consume hammers`);
+    assert.equal(board.maxDockSlots, startMaxDock, `Depth ${depth}: Auto-Play must never inflate maxDockSlots`);
+  }
+
+  // 2. Nearly-jammed mid-level rescue: player makes 4 bad non-matching moves (4/5 dock full) AND arms Hammer Mode, then triggers Auto-Play
+  for (const depth of [5, 8, 9, 12, 15]) {
+    let board = createEndlessBoard(depth);
+    let badMoves = 0;
+    let guard = 0;
+    while (board.outcome === 'ongoing' && badMoves < 4 && guard < 20) {
+      const activeCols = new Set(
+        board.activeBoxes.filter((b) => !b.completed).map((b) => b.color)
+      );
+      const nonMatch = board.screws.find(
+        (s) =>
+          s.location === 'board' &&
+          !activeCols.has(s.color) &&
+          unscrewAction(board, s.id).movesCount > board.movesCount
+      );
+      if (!nonMatch) break;
+      const attempt = unscrewAction(board, nonMatch.id);
+      if (attempt.outcome === 'defeat') break;
+      board = attempt;
+      badMoves = board.dockScrewIds.filter(Boolean).length;
+      guard++;
+    }
+
+    // Even if Hammer Mode was armed right before activating Auto-Play, Auto-Play must not consume a hammer
+    board = toggleHammerMode(board);
+    const hammersBefore = board.hammersRemaining;
+    const maxDockBefore = board.maxDockSlots;
+
+    let steps = 0;
+    while (board.outcome === 'ongoing' && steps < 40) {
+      const nextId = pickNextAutoPlayScrewId(board);
+      assert.ok(nextId, `Mid-level jammed depth ${depth}: Auto-Play must always find next bolt`);
+      board = unscrewAction(board, nextId, false, true);
+      assert.notEqual(board.outcome, 'defeat', `Mid-level jammed depth ${depth}: Auto-Play must never lose`);
+      steps++;
+    }
+    assert.equal(board.outcome, 'victory', `Mid-level jammed depth ${depth}: Auto-Play must rescue and win cleanly`);
+    assert.equal(board.hammersRemaining, hammersBefore, `Mid-level jammed depth ${depth}: Auto-Play must preserve hammers`);
+    assert.equal(board.maxDockSlots, maxDockBefore, `Mid-level jammed depth ${depth}: Auto-Play must preserve maxDockSlots`);
+  }
+});
+
 

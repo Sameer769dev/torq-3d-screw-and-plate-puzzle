@@ -673,6 +673,7 @@ export default function TorqGame() {
       freshBoard.dockScrewIds = new Array(saved.maxDockSlots).fill(null);
     }
     setBoard(freshBoard);
+    setAutoPlay((prev) => completeAutoPlayLevel(prev));
     setDayStreak(loadAndRecordDailyStreak());
     setElapsedSec(0);
     setExplodedPeek(false);
@@ -1129,17 +1130,19 @@ export default function TorqGame() {
       }));
       return;
     }
+    const remBoltsNow = board.screws.filter((s) => s.location === 'board').length;
     setAutoPlay((prev) => {
       if (!prev.isReady || prev.autoPlaying) return prev;
       hapticsEngine.pulseBoxComplete();
       soundEngine.playToolActivate('auto_play');
       setSoundState(soundEngine.getState());
-      return activateAutoPlay(prev);
+      return activateAutoPlay(prev, remBoltsNow);
     });
   }, [
     gamePhase,
     soundSettingsOpen,
     board.levelIndex,
+    board.screws,
     autoPlay.isReady,
     autoPlay.autoPlaying,
     autoPlay.percent,
