@@ -354,6 +354,21 @@ function resolveBoxCompletionsAndDockSweep(
       }
     }
 
+    // 1b. Check if any revive-banked bolt (location === 'box' without a targetBoxId yet) matches an open active box
+    for (const screw of screws) {
+      if (screw.location !== 'box' || screw.targetBoxId) continue;
+      const targetBox = nextActiveBoxes.find(
+        (b) => !b.completed && b.color === screw.color && b.screwIds.length < 3
+      );
+      if (targetBox) {
+        const boxSlot = targetBox.screwIds.length;
+        targetBox.screwIds.push(screw.id);
+        screw.targetBoxId = targetBox.id;
+        screw.targetBoxSlot = boxSlot;
+        changed = true;
+      }
+    }
+
     // 2. Check if any active box now has 3 screws
     for (let bIdx = 0; bIdx < nextActiveBoxes.length; bIdx++) {
       const box = nextActiveBoxes[bIdx];
@@ -769,6 +784,8 @@ export function reviveBoardState(state: BoardState): BoardState {
       if (sc) {
         sc.location = 'box';
         sc.dockSlotIndex = undefined;
+        sc.targetBoxId = undefined;
+        sc.targetBoxSlot = undefined;
       }
       freedCount++;
     }
@@ -780,13 +797,34 @@ export function reviveBoardState(state: BoardState): BoardState {
     nextDock.push(null);
   }
 
+  // Sweep any newly credited revive-banked bolts into matching open active boxes so the board stays 100% winnable
+  const resolved = resolveBoxCompletionsAndDockSweep(
+    nextScrews,
+    state.activeBoxes,
+    state.upcomingBoxColors,
+    nextDock,
+    state.completedBoxCount,
+    state.score,
+    state.combo
+  );
+
+  const remainingBoardScrews = nextScrews.filter((s) => s.location === 'board');
+  const allBoxesDone = resolved.completedBoxCount >= state.totalBoxes;
+  const nextOutcome: BoardState['outcome'] =
+    remainingBoardScrews.length === 0 && allBoxesDone ? 'victory' : 'ongoing';
+
   return {
     ...state,
     screws: nextScrews,
-    dockScrewIds: nextDock,
+    activeBoxes: resolved.activeBoxes,
+    upcomingBoxColors: resolved.upcomingBoxColors,
+    completedBoxCount: resolved.completedBoxCount,
+    dockScrewIds: resolved.dockScrewIds,
     maxDockSlots: nextMax,
+    score: resolved.score,
+    combo: resolved.combo,
     extraSlotUsed: nextMax >= MAX_POSSIBLE_DOCK_SLOTS,
-    outcome: 'ongoing',
+    outcome: nextOutcome,
     defeatReason: undefined,
     revivesUsed: (state.revivesUsed ?? 0) + 1,
     lastActionFeedback: {

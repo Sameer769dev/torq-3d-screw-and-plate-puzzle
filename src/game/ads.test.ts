@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createEndlessBoard,
+  findBestHintScrew,
   getDockSlotWorldX,
   MAX_POSSIBLE_DOCK_SLOTS,
   refillExtraSlotCount,
   refillHammerCount,
   reviveBoardState,
   unlockExtraDockSlot,
+  unscrewAction,
 } from './rules';
 import { fuelAutoPlayToFull, createInitialAutoPlayState } from './autoPlay';
 import { doubleDailyStreakBonus, DayStreakState } from './streak';
@@ -81,22 +83,103 @@ test('Monetization: getDockSlotWorldX symmetrically centers dock slots across th
   assert.ok(Math.abs(x0) < 3.0, 'Outermost slot must fit safely within the 6.1 unit dock rail');
 });
 
-test('Monetization: Revive (Second Chance) clears jammed bolts and unjams defeat state', () => {
-  let board = createEndlessBoard(0);
-  // Simulate dock jamming with 5 screws
-  board.dockScrewIds = ['s1', 's2', 's3', 's4', 's5'];
-  board.outcome = 'defeat';
-  board.defeatReason = 'Dock Jammed';
+test('Monetization: Revive (Second Chance) clears jammed bolts, preserves fallen plates, and stays 100% winnable', () => {
+  let board = createEndlessBoard(5);
+  // 1. Play real moves until at least 1 plate clears and falls off the board
+  let moves = 0;
+  while (
+    board.outcome === 'ongoing' &&
+    moves < 20 &&
+    !board.plates.some((p) => p.status === 'cleared')
+  ) {
+    const nextId = findBestHintScrew(board);
+    if (!nextId) break;
+    board = unscrewAction(board, nextId);
+    moves++;
+  }
+  const clearedBefore = board.plates
+    .filter((p) => p.status === 'cleared')
+    .map((p) => p.id);
+  assert.ok(clearedBefore.length >= 1, 'At least one plate should have fallen before defeat');
+
+  // 2. Deliberately extract non-matching bolts via unscrewAction until the spare dock jams into real 'defeat'
+  let jamSteps = 0;
+  while (board.outcome === 'ongoing' && jamSteps < 15) {
+    const activeCols = new Set(
+      board.activeBoxes.filter((b) => !b.completed).map((b) => b.color)
+    );
+    const badPick =
+      board.screws.find(
+        (s) => s.location === 'board' && !activeCols.has(s.color)
+      ) ?? board.screws.find((s) => s.location === 'board');
+    if (!badPick) break;
+    board = unscrewAction(board, badPick.id, false, false);
+    // If blocked, use autoPlayExtract=false? Pick an unblocked non-matching bolt!
+    if (board.lastActionFeedback?.type === 'blocked') {
+      const nextHint = findBestHintScrew(board);
+      if (!nextHint) break;
+      board = unscrewAction(board, nextHint, false, false);
+    }
+    jamSteps++;
+  }
+  if (board.outcome !== 'defeat') {
+    // Fallback deterministic jam on a multi-color board
+    let fresh = createEndlessBoard(7);
+    let safetyJam = 0;
+    while (fresh.outcome === 'ongoing' && safetyJam < 25) {
+      const activeCols = new Set(
+        fresh.activeBoxes.filter((b) => !b.completed).map((b) => b.color)
+      );
+      const unblockedNonMatch = fresh.screws.find(
+        (s) =>
+          s.location === 'board' &&
+          !activeCols.has(s.color) &&
+          unscrewAction(fresh, s.id).movesCount > fresh.movesCount
+      );
+      if (unblockedNonMatch) {
+        fresh = unscrewAction(fresh, unblockedNonMatch.id);
+      } else {
+        const hint = findBestHintScrew(fresh);
+        if (!hint) break;
+        fresh = unscrewAction(fresh, hint);
+      }
+      safetyJam++;
+    }
+    board = fresh;
+  }
+  assert.equal(board.outcome, 'defeat', 'Board should reach dock-jammed defeat state');
+  const clearedAtDefeat = board.plates
+    .filter((p) => p.status === 'cleared')
+    .map((p) => p.id);
+  const occupiedBeforeRevive = board.dockScrewIds.filter(Boolean).length;
 
   const revived = reviveBoardState(board);
   assert.equal(revived.outcome, 'ongoing');
   assert.equal(revived.defeatReason, undefined);
   assert.equal(revived.revivesUsed, 1);
-  // Cleared 2 bolts from dock
-  const occupiedCount = revived.dockScrewIds.filter(Boolean).length;
-  assert.equal(occupiedCount, 3);
-  // Also gave +1 emergency slot (5 -> 6)
+  // Previously fallen plates must remain strictly 'cleared'
+  for (const pid of clearedAtDefeat) {
+    assert.equal(
+      revived.plates.find((p) => p.id === pid)?.status,
+      'cleared',
+      'Revive must keep previously fallen plates cleared'
+    );
+  }
+  // Cleared 2 bolts from dock & added +1 emergency slot
   assert.equal(revived.maxDockSlots, 6);
+  const occupiedAfter = revived.dockScrewIds.filter(Boolean).length;
+  assert.equal(occupiedAfter, Math.max(0, occupiedBeforeRevive - 2));
+
+  // Verify the revived board can still be solved cleanly to 'victory' (no softlock from vaporized bolts!)
+  let cur = revived;
+  let safety = 0;
+  while (cur.outcome === 'ongoing' && safety < 50) {
+    const nextId = findBestHintScrew(cur);
+    if (!nextId) break;
+    cur = unscrewAction(cur, nextId, false, true);
+    safety++;
+  }
+  assert.equal(cur.outcome, 'victory', 'Revived board must remain 100% winnable with banked revive credits');
 });
 
 test('Monetization: Rewarded Hammer Refill forges additional hammers', () => {

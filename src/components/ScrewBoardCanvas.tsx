@@ -261,12 +261,12 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     const levelChanged =
       prevLevelIdxRef.current !== board.levelIndex ||
       prevFirstScrewIdRef.current !== firstScrewId;
-    const phaseEnteredPlaying =
-      prevPhaseRef.current !== 'playing' && gamePhase === 'playing';
+    const enteredFromTitle =
+      prevPhaseRef.current === 'title' && gamePhase === 'playing';
     const restartedStage =
       board.movesCount === 0 && prevMovesRef.current > 0;
 
-    if (levelChanged || phaseEnteredPlaying || restartedStage) {
+    if (levelChanged || enteredFromTitle || restartedStage) {
       prevLevelIdxRef.current = board.levelIndex;
       prevFirstScrewIdRef.current = firstScrewId;
       prevMovesRef.current = board.movesCount;
@@ -805,18 +805,27 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           0
         );
         pivotGroup.add(plateGroup);
+        const alreadyCleared = plateState.status === 'cleared';
+        const initRotZ =
+          plateState.status === 'dangling'
+            ? plateState.currentRotation
+            : plateState.baseRotation;
+        pivotGroup.rotation.set(0, 0, initRotZ);
+        if (alreadyCleared) {
+          pivotGroup.visible = false;
+        }
         levelGroup.add(pivotGroup);
 
         plateAnims.set(plateState.id, {
           pivotGroup,
           plateGroup,
           currZ: startZ,
-          currRotZ: plateState.baseRotation,
+          currRotZ: initRotZ,
           rotVel: 0,
-          fallY: 0,
+          fallY: alreadyCleared ? -12 : 0,
           fallVelY: 0,
           fallRotX: 0,
-          clearedDone: plateState.status === 'cleared',
+          clearedDone: alreadyCleared,
         });
       });
 
@@ -827,18 +836,52 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           screwState.id,
           brushedBumpMap
         );
-        const initZ = screwState.layer * 0.14 + 0.09;
-        const startZ = withEntrance
-          ? initZ + 0.36 + (sIdx % 6) * 0.04
-          : initZ;
-        const startSpin = withEntrance ? Math.PI * 2.0 : 0;
+        let wx = mapBoardX(screwState.x);
+        let wy = mapBoardY(screwState.y);
+        let startZ = screwState.layer * 0.14 + 0.09;
+        let startSpin = 0;
+        let initScale = bs;
+        let initVisible = true;
 
-        const wx = mapBoardX(screwState.x);
-        const wy = mapBoardY(screwState.y);
+        if (screwState.location === 'board') {
+          if (withEntrance) {
+            startZ += 0.36 + (sIdx % 6) * 0.04;
+            startSpin = Math.PI * 2.0;
+            initScale = 0.75 * bs;
+          }
+        } else if (screwState.location === 'dock') {
+          const dSlot = screwState.dockSlotIndex ?? 0;
+          wx = getDockSlotWorldX(dSlot, currentBoard.maxDockSlots) * ly.dockScaleX;
+          wy = ly.dockY + 0.01;
+          startZ = 0.06;
+          initScale =
+            (currentBoard.maxDockSlots > 6 ? 0.72 : 0.78) * ly.dockRingScale;
+        } else {
+          const activeBoxIdx = currentBoard.activeBoxes.findIndex(
+            (b) => b.id === screwState.targetBoxId && !b.completed
+          );
+          if (activeBoxIdx === 0 || activeBoxIdx === 1) {
+            const tray = activeBoxIdx === 0 ? targetTray0 : targetTray1;
+            const sockPos = tray.getSocketWorldPos(
+              screwState.targetBoxSlot ?? 0
+            );
+            wx = sockPos.x;
+            wy = sockPos.y;
+            startZ = sockPos.z;
+            initScale = 0.62 * ly.trayScale;
+          } else {
+            wx = 0;
+            wy = 5.4;
+            startZ = 0.5;
+            initScale = 0.01;
+            initVisible = false;
+          }
+        }
 
         screwGroup.position.set(wx, wy, startZ);
         screwGroup.rotation.set(0, 0, startSpin);
-        screwGroup.scale.setScalar(withEntrance ? 0.75 * bs : bs);
+        screwGroup.scale.setScalar(initScale);
+        screwGroup.visible = initVisible;
         levelGroup.add(screwGroup);
         interactableScrewTargets.push(screwGroup);
 
@@ -1812,7 +1855,9 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
         const pvy = mapBoardY(plateState.pivotY);
 
         if (plateState.status === 'cleared') {
-          if (!anim.clearedDone) {
+          if (anim.clearedDone) {
+            anim.pivotGroup.visible = false;
+          } else {
             const prevFallY = anim.fallY;
             anim.fallVelY -= 18 * simDt;
             anim.fallY += anim.fallVelY * simDt;
