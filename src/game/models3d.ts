@@ -197,9 +197,12 @@ export function getSpecialBoltBadgeTexture(
   if (kind === 'chaotic' && _cachedChaoticBadgeTex) return _cachedChaoticBadgeTex;
 
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   const cx = 64;
   const cy = 64;
 

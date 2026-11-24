@@ -334,7 +334,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.04;
     renderer.setPixelRatio(
-      isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2)
+      isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 3)
     );
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -590,6 +590,22 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     const dockHoleMeshes: THREE.Mesh[] = [];
     const dockHoleInnerMeshes: THREE.Mesh[] = [];
+
+    // Re-render all cached 3D UI CanvasTextures once Google display fonts finish loading
+    let fontsCancelled = false;
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (fontsCancelled) return;
+        for (const btn of [...workbenchButtons3D, ...modal3D.allModalButtons]) {
+          btn.lastCacheKey = '';
+        }
+        readoutPlaque.invalidateCache();
+        ftueHintPlinth.invalidateCache();
+        newToolPlaque.invalidateCache();
+        modal3D.invalidateCache();
+        autoPlayRig.invalidateCache();
+      });
+    }
 
     const applyViewportLayout = (ly: ViewportLayout) => {
       const setWbLayout = workbenchGroup.userData.setWorkbenchLayout as
@@ -1304,6 +1320,9 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             );
             camera.lookAt(controls.target);
           }
+          renderer.setPixelRatio(
+            isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 3)
+          );
           renderer.setSize(width, height);
           renderer.render(scene, camera);
         }
@@ -2294,6 +2313,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
 
     return () => {
       isDisposed = true;
+      fontsCancelled = true;
       cancelAnimationFrame(frameId);
       clearTimeout(frameId);
       resizeObserver.disconnect();

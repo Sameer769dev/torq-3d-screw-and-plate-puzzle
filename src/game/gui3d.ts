@@ -50,11 +50,29 @@ export type ModalOverlay3DState =
   | { kind: 'session_recap'; levelNumber: number; score: number; maxCombo: number }
   | { kind: 'cloud_conflict'; cloud: TorqSaveBlob; local: TorqSaveBlob };
 
+const UI_TEX_SUPERSAMPLE = 2;
+const BUTTON_TEX_SUPERSAMPLE = 3;
+
+function configureCrispUITexture(
+  texture: THREE.CanvasTexture,
+  maxAnisotropy: number
+): THREE.CanvasTexture {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.max(1, maxAnisotropy);
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  return texture;
+}
+
 export interface Button3DHandle {
   group: THREE.Group;
   capMesh: THREE.Mesh;
   topDecalMesh: THREE.Mesh;
   canvas: HTMLCanvasElement;
+  logicalW: number;
+  logicalH: number;
+  texScale: number;
   texture: THREE.CanvasTexture;
   action: Gui3DAction;
   baseZ: number;
@@ -143,8 +161,11 @@ export function updateButton3DCapTexture(
   handle.lastCacheKey = cacheKey;
 
   const ctx = handle.canvas.getContext('2d')!;
-  const w = handle.canvas.width;
-  const h = handle.canvas.height;
+  const w = handle.logicalW;
+  const h = handle.logicalH;
+  ctx.setTransform(handle.texScale, 0, 0, handle.texScale, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, w, h);
 
   const cornerR = Math.min(w, h) * 0.24;
@@ -196,6 +217,10 @@ export function updateButton3DCapTexture(
     ctx.closePath();
     ctx.fill();
   } else {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1.5;
     ctx.fillStyle = disabled ? '#475569' : '#F8FAFC';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -207,15 +232,21 @@ export function updateButton3DCapTexture(
       ctx.font = `700 ${labelPx}px "Chakra Petch", sans-serif`;
     }
     ctx.fillText(label, w / 2, subLabel ? h * 0.42 : h * 0.52, maxTextW);
+    ctx.restore();
   }
 
   if (subLabel) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+    ctx.shadowBlur = 2.5;
+    ctx.shadowOffsetY = 1;
     ctx.fillStyle = disabled ? '#475569' : active ? '#FDE68A' : accentHex;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const maxSubW = Math.max(60, w - 28);
-    ctx.font = '700 21px "JetBrains Mono", monospace';
+    ctx.font = '700 22px "JetBrains Mono", monospace';
     ctx.fillText(subLabel, w / 2, h * 0.74, maxSubW);
+    ctx.restore();
   }
 
   // Optional corner badge circle
@@ -312,14 +343,18 @@ export function create3DControlButton(
   capMesh.userData = { guiAction: action };
   group.add(capMesh);
 
-  // 3. Crisp rounded-corner top face decal with zero specular glare
+  // 3. Crisp 3x-supersampled rounded-corner top face decal with zero specular glare & toneMapped: false
   const canvas = document.createElement('canvas');
   const aspect = Math.max(1, width / Math.max(0.1, height));
-  canvas.width = Math.round(140 * aspect);
-  canvas.height = 140;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = maxAnisotropy;
+  const logicalW = Math.round(140 * aspect);
+  const logicalH = 140;
+  const texScale = BUTTON_TEX_SUPERSAMPLE;
+  canvas.width = logicalW * texScale;
+  canvas.height = logicalH * texScale;
+  const texture = configureCrispUITexture(
+    new THREE.CanvasTexture(canvas),
+    maxAnisotropy
+  );
 
   const topGeo = createRoundedPlaneGeometry(
     width * 0.92,
@@ -329,6 +364,7 @@ export function create3DControlButton(
   );
   const topMat = new THREE.MeshBasicMaterial({
     map: texture,
+    toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -343,6 +379,9 @@ export function create3DControlButton(
     capMesh,
     topDecalMesh,
     canvas,
+    logicalW,
+    logicalH,
+    texScale,
     texture,
     action,
     baseZ: 0.08,
@@ -388,15 +427,17 @@ export function create3DReadoutPlaque(maxAnisotropy: number) {
   group.add(housing);
 
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 176;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = maxAnisotropy;
+  canvas.width = 512 * UI_TEX_SUPERSAMPLE;
+  canvas.height = 176 * UI_TEX_SUPERSAMPLE;
+  const texture = configureCrispUITexture(
+    new THREE.CanvasTexture(canvas),
+    maxAnisotropy
+  );
 
   const screenGeo = createRoundedPlaneGeometry(2.48, 0.8, 0.11, 16);
   const screenMat = new THREE.MeshBasicMaterial({
     map: texture,
+    toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -1,
   });
@@ -428,6 +469,9 @@ export function create3DReadoutPlaque(maxAnisotropy: number) {
     lastKey = key;
 
     const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(UI_TEX_SUPERSAMPLE, 0, 0, UI_TEX_SUPERSAMPLE, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, 512, 176);
 
     const bgGrad = ctx.createLinearGradient(0, 0, 0, 176);
@@ -553,7 +597,11 @@ export function create3DReadoutPlaque(maxAnisotropy: number) {
     texture.needsUpdate = true;
   }
 
-  return { group, update };
+  function invalidateCache() {
+    lastKey = '';
+  }
+
+  return { group, update, invalidateCache };
 }
 
 interface BannerPlaqueSurface {
@@ -639,12 +687,13 @@ function create3DBannerPlaque(options: {
   }
 
   const canvas = document.createElement('canvas');
-  canvas.width = canvasW;
-  canvas.height = canvasH;
+  canvas.width = canvasW * UI_TEX_SUPERSAMPLE;
+  canvas.height = canvasH * UI_TEX_SUPERSAMPLE;
   const ctx = canvas.getContext('2d')!;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = maxAnisotropy;
+  const texture = configureCrispUITexture(
+    new THREE.CanvasTexture(canvas),
+    maxAnisotropy
+  );
 
   const screenGeo = createRoundedPlaneGeometry(
     width - 0.26,
@@ -654,6 +703,7 @@ function create3DBannerPlaque(options: {
   );
   const screenMat = new THREE.MeshBasicMaterial({
     map: texture,
+    toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -1,
   });
@@ -669,6 +719,9 @@ function drawBannerBasePlate(
   accentHex: string
 ): void {
   const { ctx, canvasW: w, canvasH: h } = surface;
+  ctx.setTransform(UI_TEX_SUPERSAMPLE, 0, 0, UI_TEX_SUPERSAMPLE, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, w, h);
 
   const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
@@ -756,7 +809,11 @@ export function create3DFtueHintPlinth(maxAnisotropy: number) {
     texture.needsUpdate = true;
   }
 
-  return { group: surface.group, update };
+  function invalidateCache() {
+    lastKey = '';
+  }
+
+  return { group: surface.group, update, invalidateCache };
 }
 
 /**
@@ -817,7 +874,11 @@ export function create3DNewToolPlaque(maxAnisotropy: number) {
     texture.needsUpdate = true;
   }
 
-  return { group: surface.group, update };
+  function invalidateCache() {
+    lastKey = '';
+  }
+
+  return { group: surface.group, update, invalidateCache };
 }
 
 /**
@@ -967,17 +1028,19 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
     root.add(stud);
   }
 
-  // Rounded-corner anti-glare OLED screen on the 3D tablet
+  // Rounded-corner 2x-supersampled anti-glare OLED screen on the 3D tablet
   const screenCanvas = document.createElement('canvas');
-  screenCanvas.width = 768;
-  screenCanvas.height = 460;
-  const screenTex = new THREE.CanvasTexture(screenCanvas);
-  screenTex.colorSpace = THREE.SRGBColorSpace;
-  screenTex.anisotropy = maxAnisotropy;
+  screenCanvas.width = 768 * UI_TEX_SUPERSAMPLE;
+  screenCanvas.height = 460 * UI_TEX_SUPERSAMPLE;
+  const screenTex = configureCrispUITexture(
+    new THREE.CanvasTexture(screenCanvas),
+    maxAnisotropy
+  );
 
   const screenGeo = createRoundedPlaneGeometry(5.34, 3.16, 0.2, 18);
   const screenMat = new THREE.MeshBasicMaterial({
     map: screenTex,
+    toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -1,
   });
@@ -1440,6 +1503,9 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
     lastScreenKey = screenKey;
 
     const ctx = screenCanvas.getContext('2d')!;
+    ctx.setTransform(UI_TEX_SUPERSAMPLE, 0, 0, UI_TEX_SUPERSAMPLE, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, 768, 460);
 
     const screenGrad = ctx.createRadialGradient(384, 140, 40, 384, 230, 460);
@@ -1940,7 +2006,11 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
     ...packBtns,
     ...stageBtns,
   ];
-  return { root, allModalButtons, updateModal3D };
+  function invalidateCache() {
+    lastScreenKey = '';
+  }
+
+  return { root, allModalButtons, updateModal3D, invalidateCache };
 }
 
 /**
@@ -1983,17 +2053,19 @@ export function create3DRadioactiveAutoPlayRig(maxAnisotropy: number) {
   spineBody.castShadow = true;
   group.add(spineBody);
 
-  // 2. Top OLED Charge Status Readout Screen (y = +1.46)
+  // 2. Top 2x-Supersampled OLED Charge Status Readout Screen (y = +1.46)
   const headerCanvas = document.createElement('canvas');
-  headerCanvas.width = 220;
-  headerCanvas.height = 110;
-  const headerTex = new THREE.CanvasTexture(headerCanvas);
-  headerTex.colorSpace = THREE.SRGBColorSpace;
-  headerTex.anisotropy = maxAnisotropy;
+  headerCanvas.width = 220 * UI_TEX_SUPERSAMPLE;
+  headerCanvas.height = 110 * UI_TEX_SUPERSAMPLE;
+  const headerTex = configureCrispUITexture(
+    new THREE.CanvasTexture(headerCanvas),
+    maxAnisotropy
+  );
 
   const headerGeo = createRoundedPlaneGeometry(0.92, 0.46, 0.08, 12);
   const headerMat = new THREE.MeshBasicMaterial({
     map: headerTex,
+    toneMapped: false,
     polygonOffset: true,
     polygonOffsetFactor: -1,
   });
@@ -2313,6 +2385,9 @@ export function create3DRadioactiveAutoPlayRig(maxAnisotropy: number) {
     if (headerKey !== lastHeaderKey) {
       lastHeaderKey = headerKey;
       const ctx = headerCanvas.getContext('2d')!;
+      ctx.setTransform(UI_TEX_SUPERSAMPLE, 0, 0, UI_TEX_SUPERSAMPLE, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.clearRect(0, 0, 220, 110);
 
       traceRoundRect(ctx, 2, 2, 216, 106, 18);
@@ -2337,7 +2412,11 @@ export function create3DRadioactiveAutoPlayRig(maxAnisotropy: number) {
     }
   }
 
-  return { group, buttonHandle: autoPlayBtn, update };
+  function invalidateCache() {
+    lastHeaderKey = '';
+  }
+
+  return { group, buttonHandle: autoPlayBtn, update, invalidateCache };
 }
 
 export interface NativeAdBillboardHandle {
