@@ -172,7 +172,15 @@ export default function TorqGame() {
   const [bestScore, setBestScore] = useState<number>(
     () => cloudSaveManager.getState().bestScore ?? 0
   );
-  const [elapsedSec, setElapsedSec] = useState<number>(0);
+  const elapsedSecRef = useRef<number>(0);
+  const gamePhaseRef = useRef<GamePhase>(gamePhase);
+  gamePhaseRef.current = gamePhase;
+  const soundSettingsOpenRef = useRef<boolean>(soundSettingsOpen);
+  soundSettingsOpenRef.current = soundSettingsOpen;
+  const sessionRecapOpenRef = useRef<boolean>(sessionRecapOpen);
+  sessionRecapOpenRef.current = sessionRecapOpen;
+  const boardLevelIndexRef = useRef<number>(board.levelIndex);
+  boardLevelIndexRef.current = board.levelIndex;
   const [muted, setMuted] = useState<boolean>(() => soundEngine.muted);
   const [explodedPeek, setExplodedPeek] = useState<boolean>(false);
   const [dockCollapsed, setDockCollapsed] = useState<boolean>(false);
@@ -354,20 +362,21 @@ export default function TorqGame() {
     setNewToolToast(null);
   }, [board.levelIndex, gamePhase]);
 
-  // Capacitor Native Android Lifecycle, Status Bar, Ads & Back Button Integration
+  // Capacitor Native Android Lifecycle, Status Bar, Ads & Back Button Integration (runs ONCE on mount!)
   useEffect(() => {
-    // Initialize Google AdMob monetization engine & ensure bottom banner is hidden
-    adsManager.initialize().then(() => {
-      adsManager.hideBanner();
-    });
+    // Initialize Google AdMob monetization engine
+    adsManager.initialize();
 
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         analyticsManager.logEvent('session_end', {
           session_count: ftueStateRef.current.sessionCount,
-          highest_level_index: Math.max(highestLevelRef.current, board.levelIndex),
+          highest_level_index: Math.max(
+            highestLevelRef.current,
+            boardLevelIndexRef.current
+          ),
           ftue_completed: ftueStateRef.current.completed,
-          duration_ms: elapsedSec * 1000,
+          duration_ms: elapsedSecRef.current * 1000,
         });
       }
     };
@@ -391,36 +400,46 @@ export default function TorqGame() {
     // Dismiss native splash screen once React & Three.js are active
     SplashScreen.hide().catch(() => { });
 
-    // Handle physical / gesture Android back button navigation
+    // Handle physical / gesture Android back button navigation (reads live refs, zero re-registration!)
     const backListenerPromise = CapApp.addListener('backButton', () => {
-      if (sessionRecapOpen) {
+      if (sessionRecapOpenRef.current) {
         setSessionRecapOpen(false);
-      } else if (soundSettingsOpen) {
+      } else if (soundSettingsOpenRef.current) {
         setSoundSettingsOpen(false);
-      } else if (gamePhase === 'playing' || gamePhase === 'paused' || gamePhase === 'gameover') {
+      } else if (
+        gamePhaseRef.current === 'playing' ||
+        gamePhaseRef.current === 'paused' ||
+        gamePhaseRef.current === 'gameover'
+      ) {
         setGamePhase('title');
       } else {
         CapApp.exitApp();
       }
     });
 
-    const appStateListenerPromise = CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive) {
-        analyticsManager.logEvent('session_end', {
-          session_count: ftueStateRef.current.sessionCount,
-          highest_level_index: Math.max(highestLevelRef.current, board.levelIndex),
-          ftue_completed: ftueStateRef.current.completed,
-          duration_ms: elapsedSec * 1000,
-        });
+    const appStateListenerPromise = CapApp.addListener(
+      'appStateChange',
+      ({ isActive }) => {
+        if (!isActive) {
+          analyticsManager.logEvent('session_end', {
+            session_count: ftueStateRef.current.sessionCount,
+            highest_level_index: Math.max(
+              highestLevelRef.current,
+              boardLevelIndexRef.current
+            ),
+            ftue_completed: ftueStateRef.current.completed,
+            duration_ms: elapsedSecRef.current * 1000,
+          });
+        }
       }
-    });
+    );
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       backListenerPromise.then((h) => h.remove()).catch(() => { });
       appStateListenerPromise.then((h) => h.remove()).catch(() => { });
     };
-  }, [soundSettingsOpen, gamePhase, sessionRecapOpen, board.levelIndex, elapsedSec]);
+  }, []);
 
   const handleOpenSoundSettings = useCallback(() => {
     hapticsEngine.pulseButtonTap();
@@ -597,11 +616,11 @@ export default function TorqGame() {
     handleTestSoundPack,
   ]);
 
-  // Elapsed timer when in 'playing' state and Sound Settings Menu is closed
+  // Lightweight ref-based elapsed timer (zero React root re-renders during 60fps gameplay)
   useEffect(() => {
     if (gamePhase !== 'playing' || soundSettingsOpen) return;
     const interval = window.setInterval(() => {
-      setElapsedSec((prev) => prev + 1);
+      elapsedSecRef.current += 1;
     }, 1000);
     return () => clearInterval(interval);
   }, [gamePhase, soundSettingsOpen]);
@@ -687,7 +706,7 @@ export default function TorqGame() {
     setBoard(freshBoard);
     setAutoPlay((prev) => completeAutoPlayLevel(prev));
     setDayStreak(loadAndRecordDailyStreak());
-    setElapsedSec(0);
+    elapsedSecRef.current = 0;
     setExplodedPeek(false);
     setSoundSettingsOpen(false);
     setRunSnapshot(null);
@@ -729,7 +748,7 @@ export default function TorqGame() {
         analyticsManager.logEvent('ftue_step', {
           step: nextFtue.step,
           level_index: board.levelIndex,
-          elapsed_ms: elapsedSec * 1000,
+          elapsed_ms: elapsedSecRef.current * 1000,
         });
       }
 
@@ -911,7 +930,7 @@ export default function TorqGame() {
               levelName: nextBoard.levelName,
               score: nextBoard.score,
               bestScore: Math.max(bestScore, nextBoard.score),
-              elapsedSec,
+              elapsedSec: elapsedSecRef.current,
               parTimeSec: nextBoard.parTimeSec,
               screwsCleared,
               totalScrews: nextBoard.screws.length,
@@ -940,7 +959,6 @@ export default function TorqGame() {
       soundSettingsOpen,
       sessionRecapOpen,
       bestScore,
-      elapsedSec,
       board.levelIndex,
     ]
   );
@@ -1641,7 +1659,7 @@ export default function TorqGame() {
         board={board}
         gamePhase={gamePhase}
         bestScore={bestScore}
-        elapsedSec={elapsedSec}
+        elapsedSec={elapsedSecRef.current}
         muted={muted}
         soundSettingsOpen={soundSettingsOpen}
         soundState={soundState}

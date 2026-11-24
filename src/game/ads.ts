@@ -459,7 +459,7 @@ class AdsManager {
   }
 
   async hideBanner(): Promise<void> {
-    if (!Capacitor.isNativePlatform()) {
+    if (!this.bannerVisible || !Capacitor.isNativePlatform()) {
       this.bannerVisible = false;
       return;
     }

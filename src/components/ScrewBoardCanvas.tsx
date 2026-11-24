@@ -326,6 +326,10 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
     })();
 
+    const isNativeMobile = Capacitor.isNativePlatform();
+    const maxPixelRatio = isSoftwareGl ? 1 : isNativeMobile ? 2 : 3;
+    const useSinglePassAcrylic = isSoftwareGl || isNativeMobile;
+
     const renderer = new THREE.WebGLRenderer({
       antialias: !isSoftwareGl,
       powerPreference: 'high-performance',
@@ -334,7 +338,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.04;
     renderer.setPixelRatio(
-      isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 3)
+      Math.min(window.devicePixelRatio || 1, maxPixelRatio)
     );
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -727,8 +731,24 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
       ly * layoutRef.current.boardSpreadY + layoutRef.current.boardOffsetY;
 
     function buildLevelScene(withEntrance = true) {
+      // Properly dispose non-shared geometries & materials so mobile Mali GPUs never leak VRAM across levels
       while (levelGroup.children.length > 0) {
-        levelGroup.remove(levelGroup.children[0]);
+        const child = levelGroup.children[0];
+        child.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.isMesh) {
+            if (mesh.geometry && !mesh.geometry.userData?.shared) {
+              mesh.geometry.dispose();
+            }
+            const mats = Array.isArray(mesh.material)
+              ? mesh.material
+              : [mesh.material];
+            for (const m of mats) {
+              m?.dispose();
+            }
+          }
+        });
+        levelGroup.remove(child);
       }
       screwAnims.clear();
       plateAnims.clear();
@@ -812,7 +832,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
           visPlateW,
           visPlateH,
           holeCoords,
-          isSoftwareGl,
+          useSinglePassAcrylic,
           brushedBumpMap
         );
         plateGroup.position.set(
@@ -1321,7 +1341,7 @@ export const ScrewBoardCanvas: React.FC<Props> = ({
             camera.lookAt(controls.target);
           }
           renderer.setPixelRatio(
-            isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 3)
+            Math.min(window.devicePixelRatio || 1, maxPixelRatio)
           );
           renderer.setSize(width, height);
           renderer.render(scene, camera);

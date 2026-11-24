@@ -181,6 +181,7 @@ function getChamferedHexHeadGeo(): THREE.ExtrudeGeometry {
       bevelSegments: 4,
       curveSegments: 12,
     });
+    _cachedHexHeadGeo.userData = { shared: true };
   }
   return _cachedHexHeadGeo;
 }
@@ -607,16 +608,16 @@ export function createCompositePlateGroup(
     const tint = colorMap[materialType] ?? 0x38bdf8;
     plateMat = new THREE.MeshPhysicalMaterial({
       color: tint,
-      roughness: 0.26,
+      roughness: isSoftwareGl ? 0.18 : 0.24,
       metalness: 0.04,
       transmission: isSoftwareGl ? 0 : 0.68,
       transparent: true,
-      opacity: isSoftwareGl ? 0.56 : 0.78,
+      opacity: isSoftwareGl ? 0.72 : 0.78,
       ior: 1.48,
       thickness: 0.35,
-      clearcoat: 0.25,
-      clearcoatRoughness: 0.28,
-      envMapIntensity: 0.75,
+      clearcoat: isSoftwareGl ? 0.55 : 0.25,
+      clearcoatRoughness: 0.22,
+      envMapIntensity: 0.85,
       depthWrite: false,
     });
   } else {

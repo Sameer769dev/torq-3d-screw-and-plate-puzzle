@@ -51,7 +51,7 @@ export type ModalOverlay3DState =
   | { kind: 'cloud_conflict'; cloud: TorqSaveBlob; local: TorqSaveBlob };
 
 const UI_TEX_SUPERSAMPLE = 2;
-const BUTTON_TEX_SUPERSAMPLE = 3;
+const BUTTON_TEX_SUPERSAMPLE = 2;
 
 function configureCrispUITexture(
   texture: THREE.CanvasTexture,
