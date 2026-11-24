@@ -1908,19 +1908,19 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
         ctx.fillText('UNBOLT ALL TARGET PLATES TO ADVANCE', 384, 338);
       }
 
-      ctx.fillStyle = cloudConnected ? '#10B981' : '#94A3B8';
-      ctx.font = '700 15px "JetBrains Mono", monospace';
-      ctx.fillText(
-        cloudConnected
-          ? '☁ GOOGLE PLAY GAMES: AUTO CLOUD SYNC ACTIVE'
-          : '💾 LOCAL STORAGE: AUTO-SAVED',
-        384,
-        395
-      );
+      if (cloudConnected) {
+        ctx.fillStyle = '#10B981';
+        ctx.font = '700 15px "JetBrains Mono", monospace';
+        ctx.fillText('☁ GOOGLE PLAY GAMES: AUTO CLOUD SYNC ACTIVE', 384, 395);
+      }
 
       ctx.fillStyle = '#38BDF8';
       ctx.font = '700 19px "JetBrains Mono", monospace';
-      ctx.fillText('CLICK 3D BOLTS OR PRESS PLAY BELOW', 384, 424);
+      ctx.fillText(
+        'CLICK 3D BOLTS OR PRESS PLAY BELOW',
+        384,
+        cloudConnected ? 424 : 412
+      );
     } else if (phase === 'paused') {
       ctx.fillStyle = '#F59E0B';
       ctx.font = '700 28px "JetBrains Mono", monospace';
@@ -1946,15 +1946,11 @@ export function create3DDiegeticModalStage(maxAnisotropy: number) {
         355
       );
 
-      ctx.fillStyle = cloudConnected ? '#10B981' : '#38BDF8';
-      ctx.font = '700 16px "JetBrains Mono", monospace';
-      ctx.fillText(
-        cloudConnected
-          ? '☁ GOOGLE PLAY GAMES: AUTO CLOUD SYNC ACTIVE'
-          : '💾 LOCAL STORAGE: AUTO-SAVED',
-        384,
-        405
-      );
+      if (cloudConnected) {
+        ctx.fillStyle = '#10B981';
+        ctx.font = '700 16px "JetBrains Mono", monospace';
+        ctx.fillText('☁ GOOGLE PLAY GAMES: AUTO CLOUD SYNC ACTIVE', 384, 405);
+      }
     } else if (phase === 'gameover' && runSnapshot) {
       const isWin = runSnapshot.outcome === 'victory';
       const snapLvl = runSnapshot.levelIndex + 1;
