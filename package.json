@@ -1,7 +1,7 @@
 {
   "name": "torq-screw-and-plate-puzzle",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.14",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js --port=3000 --host=0.0.0.0",
